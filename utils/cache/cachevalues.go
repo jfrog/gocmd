@@ -1,4 +1,4 @@
-package golang
+package cache
 
 type DependenciesCache struct {
 	modulesPublished map[string]bool

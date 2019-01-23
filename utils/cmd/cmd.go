@@ -1,4 +1,4 @@
-package golang
+package cmd
 
 import (
 	"errors"
@@ -13,8 +13,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
-	"time"
 )
 
 const GOPROXY = "GOPROXY"
@@ -105,7 +103,7 @@ func DownloadDependency(dependencyName string) error {
 	if err != nil {
 		return err
 	}
-
+	log.Debug("Running go mod download -json", dependencyName)
 	goCmd.Command = []string{"mod", "download", "-json", dependencyName}
 	return errorutils.CheckError(gofrogcmd.RunCmd(goCmd))
 }
@@ -124,21 +122,13 @@ func GetDependenciesGraph() (map[string]bool, error) {
 
 	// Read and store the details of the go.mod and go.sum files,
 	// because they may change by the "go mod graph" command.
-	modFileContent, modFileStat, err := getFileDetails(filepath.Join(projectDir, "go.mod"))
+	modFileContent, modFileStat, err := GetFileDetails(filepath.Join(projectDir, "go.mod"))
 	if err != nil {
 		return nil, err
 	}
-	sumFileExists, err := fileutils.IsFileExists(filepath.Join(projectDir, "go.sum"), false)
-	if err != nil {
-		return nil, err
-	}
-	var sumFileContent []byte
-	var sumFileStat os.FileInfo
-	if sumFileExists {
-		sumFileContent, sumFileStat, err = getFileDetails(filepath.Join(projectDir, "go.sum"))
-		if err != nil {
-			return nil, err
-		}
+	sumFileContent, sumFileStat, err := GetSumContentAndRemove(projectDir)
+	if len(sumFileContent) > 0 && sumFileStat != nil {
+		defer RestoreSumFile(projectDir, sumFileContent, sumFileStat)
 	}
 
 	log.Info("Running 'go mod graph' in", pwd)
@@ -155,6 +145,7 @@ func GetDependenciesGraph() (map[string]bool, error) {
 	}
 
 	if err != nil {
+		// If the command fails, the mod stays the same, therefore, don't need to be restored.
 		return nil, errorutils.CheckError(err)
 	}
 
@@ -164,37 +155,8 @@ func GetDependenciesGraph() (map[string]bool, error) {
 	if err != nil {
 		return nil, err
 	}
-	if sumFileExists {
-		err = ioutil.WriteFile(filepath.Join(projectDir, "go.sum"), sumFileContent, sumFileStat.Mode())
-		if err != nil {
-			return nil, err
-		}
-	}
+
 	return outputToMap(output), errorutils.CheckError(err)
-}
-
-func getFileDetails(filePath string) (modFileContent []byte, modFileStat os.FileInfo, err error) {
-	modFileStat, err = os.Stat(filePath)
-	if errorutils.CheckError(err) != nil {
-		return
-	}
-	modFileContent, err = ioutil.ReadFile(filePath)
-	errorutils.CheckError(err)
-	return
-}
-
-func outputToMap(output string) map[string]bool {
-	lineOutput := strings.Split(output, "\n")
-	var result []string
-	mapOfDeps := map[string]bool{}
-	for _, line := range lineOutput {
-		splitLine := strings.Split(line, " ")
-		if len(splitLine) == 2 {
-			mapOfDeps[splitLine[1]] = true
-			result = append(result, splitLine[1])
-		}
-	}
-	return mapOfDeps
 }
 
 // Using go mod download command to download all the dependencies before publishing to Artifactory
@@ -212,29 +174,27 @@ func RunGoModTidy() error {
 
 	goCmd.Command = []string{"mod", "tidy"}
 	_, err = gofrogcmd.RunCmdOutput(goCmd)
-	if err != nil {
-		return errorutils.CheckError(err)
-	}
-
-	err = signModFile()
 	return err
 }
 
-func signModFile() error {
-	rootDir, err := GetProjectRoot()
+func RunGoModInit(moduleName, modEditMessage string) error {
+	pwd, err := os.Getwd()
 	if err != nil {
 		return err
 	}
-	modFilePath := filepath.Join(rootDir, "go.mod")
-	stat, err := os.Stat(modFilePath)
+
+	log.Info("Running 'go mod init' in", pwd)
+	goCmd, err := NewCmd()
 	if err != nil {
-		return errorutils.CheckError(err)
+		return err
 	}
-	modFileContent, err := ioutil.ReadFile(modFilePath)
-	editedByCli := "// Edited by JFrog CLI on " + time.Now().Local().String() + "\n\n"
-	newContent := append([]byte(editedByCli), modFileContent...)
-	err = ioutil.WriteFile(modFilePath, newContent, stat.Mode())
-	return errorutils.CheckError(err)
+
+	goCmd.Command = []string{"mod", "init", moduleName}
+	_, err = gofrogcmd.RunCmdWithOutputParser(goCmd)
+	if err != nil {
+		return err
+	}
+	return signModFile(modEditMessage)
 }
 
 // Returns the root dir where the go.mod located.

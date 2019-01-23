@@ -3,7 +3,6 @@ package dependencies
 import (
 	"fmt"
 	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -11,7 +10,7 @@ import (
 )
 
 func TestGetPackageZipLocation(t *testing.T) {
-	baseDir, err := GetBaseDir()
+	baseDir, err := getBaseDir()
 	if err != nil {
 		t.Error(err)
 	}
@@ -62,17 +61,13 @@ func TestGetDependencyName(t *testing.T) {
 	}
 }
 
-func TestCreateDependencyWithMod(t *testing.T) {
+func TestCreateDependency(t *testing.T) {
 	err := fileutils.CreateTempDirPath()
 	if err != nil {
 		t.Error(err)
 	}
 	defer fileutils.RemoveTempDir()
-	tempDir, err := fileutils.GetTempDirPath()
-	if err != nil {
-		t.Error(err)
-	}
-	baseDir, err := GetBaseDir()
+	baseDir, err := getBaseDir()
 	if err != nil {
 		t.Error(err)
 	}
@@ -83,23 +78,54 @@ func TestCreateDependencyWithMod(t *testing.T) {
 		modContent: []byte(modContent),
 		zipPath:    filepath.Join(cachePath, "v1.2.3.zip"),
 	}
-	pathReturned, err := createDependencyWithMod(dep)
+	tempDir, err := createDependencyInTemp(dep.GetZipPath())
 	if err != nil {
 		t.Error(err)
 	}
+	path := filepath.Join(tempDir, "github.com", "test@v1.2.3", "test.go")
+
+	exists, err := fileutils.IsFileExists(path, false)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if !exists {
+		t.Error(fmt.Sprintf("Missing %s", path))
+	}
+	err = os.RemoveAll(filepath.Join(tempDir, "github.com"))
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestGetModPath(t *testing.T) {
+	err := fileutils.CreateTempDirPath()
+	if err != nil {
+		t.Error(err)
+	}
+	defer fileutils.RemoveTempDir()
+	baseDir, err := getBaseDir()
+	if err != nil {
+		t.Error(err)
+	}
+	cachePath := filepath.Join(baseDir, "zip")
+	modContent := "module github.com/test"
+	dep := Package{
+		id:         "github.com/test:v1.2.3",
+		modContent: []byte(modContent),
+		zipPath:    filepath.Join(cachePath, "v1.2.3.zip"),
+	}
+	pwd := PackageWithDeps{Dependency:&dep}
+	tempDir, err := createDependencyInTemp(dep.GetZipPath())
+	if err != nil {
+		t.Error(err)
+	}
+	modPath := pwd.getModPathInTemp(tempDir)
 	path := filepath.Join(tempDir, "github.com", "test@v1.2.3", "go.mod")
-	if path != pathReturned {
-		t.Error(fmt.Sprintf("Expected %s, got %s", path, pathReturned))
+	if path != modPath {
+		t.Error(fmt.Sprintf("Expected %s, got %s", path, modPath))
 	}
 
-	mod, err := ioutil.ReadFile(pathReturned)
-	if err != nil {
-		t.Error(err)
-	}
-
-	if modContent != string(mod) {
-		t.Error(fmt.Sprintf("Expected %s, got %s", modContent, string(mod)))
-	}
 	err = os.RemoveAll(filepath.Join(tempDir, "github.com"))
 	if err != nil {
 		t.Error(err)
@@ -131,7 +157,7 @@ func TestMergeReplaceDependenciesWithGraphDependencies(t *testing.T) {
 	}
 }
 
-func GetBaseDir() (baseDir string, err error) {
+func getBaseDir() (baseDir string, err error) {
 	pwd, err := os.Getwd()
 	if err != nil {
 		return "", err
