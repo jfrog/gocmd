@@ -49,8 +49,12 @@ func (pwd *PackageWithDeps) PopulateModAndPublish(targetRepo string, cache *cach
 	if published {
 		log.Debug("Overwriting the mod file in the cache from the one from Artifactory", pwd.Dependency.GetId())
 		moduleAndVersion := strings.Split(pwd.Dependency.GetId(), ":")
-		path = downloadModFileFromArtifactoryToLocalCache(pwd.cachePath, targetRepo, moduleAndVersion[0], moduleAndVersion[1], serviceManager.GetConfig().GetArtDetails(), httpclient.NewDefaultHttpClient())
-		err := pwd.updateModContent(path, cache)
+		client, err := httpclient.ClientBuilder().Build()
+		if err != nil {
+			return err
+		}
+		path = downloadModFileFromArtifactoryToLocalCache(pwd.cachePath, targetRepo, moduleAndVersion[0], moduleAndVersion[1], serviceManager.GetConfig().GetArtDetails(), client)
+		err = pwd.updateModContent(path, cache)
 		logError(err)
 	}
 
@@ -115,34 +119,42 @@ func (pwd *PackageWithDeps) createDependencyAndPrepareMod(cache *cache.Dependenc
 		}
 	} else {
 		published, _ := cache.GetMap()[pwd.Dependency.GetId()]
-		var originalModContent []byte
 		if !published {
-			originalModContent = pwd.prepareUnpublishedDependency(path, originalModContent)
+			output, err = pwd.prepareUnpublishedDependency(path)
+			return
 		} else {
-			originalModContent = pwd.Dependency.GetModContent()
-			// Put the mod file to temp
-			err = writeModContentToModFile(path, pwd.Dependency.GetModContent())
-			logError(err)
-		}
-		// If not empty --> use the mod file and don't run go mod tidy
-		// If empty --> Run go mod tidy. Publish the package with empty mod file.
-		if !pwd.PatternMatched(pwd.regExp.GetNotEmptyModRegex()) {
-			log.Debug("The mod still empty after running 'go mod init' for:", pwd.Dependency.GetId())
-			err = populateModWithTidy(path)
-			logError(err)
-			// Need to remember here to revert to the empty mod file.
-			pwd.shouldRevertToEmptyMod = true
-			pwd.originalModContent = originalModContent
-		} else {
-			log.Debug("Project mod file after init is not empty", pwd.Dependency.id)
+			pwd.prepareResolvedDependency(path)
 		}
 	}
 	output, err = runGoModGraph()
 	return
 }
 
-func (pwd *PackageWithDeps) prepareUnpublishedDependency(pathToModFile string, originalModContent []byte) []byte {
-	err := pwd.prepareAndRunInit(pathToModFile)
+func (pwd *PackageWithDeps) prepareResolvedDependency(path string) {
+	// Put the mod file to temp
+	err := writeModContentToModFile(path, pwd.Dependency.GetModContent())
+	logError(err)
+	// If not empty --> use the mod file and don't run go mod tidy
+	// If empty --> Run go mod tidy. Publish the package with empty mod file.
+	if !pwd.PatternMatched(pwd.regExp.GetNotEmptyModRegex()) {
+		log.Debug("The mod still empty after downloading from Artifactory:", pwd.Dependency.GetId())
+		originalModContent := pwd.Dependency.GetModContent()
+		pwd.prepareAndRunTidy(path, originalModContent)
+	} else {
+		log.Debug("Project mod file is not empty after downloading from Artifactory", pwd.Dependency.id)
+	}
+}
+
+func (pwd *PackageWithDeps) prepareAndRunTidy(path string, originalModContent []byte) {
+	err := populateModWithTidy(path)
+	logError(err)
+	// Need to remember here to revert to the empty mod file.
+	pwd.shouldRevertToEmptyMod = true
+	pwd.originalModContent = originalModContent
+}
+
+func (pwd *PackageWithDeps) prepareUnpublishedDependency(pathToModFile string) (output map[string]bool, err error) {
+	err = pwd.prepareAndRunInit(pathToModFile)
 	if err != nil {
 		log.Error(err)
 		exists, err := fileutils.IsFileExists(pathToModFile, false)
@@ -156,9 +168,29 @@ func (pwd *PackageWithDeps) prepareUnpublishedDependency(pathToModFile string, o
 	// Got here means init worked or mod was created. Need to check the content if mod is empty or not
 	modContent, err := ioutil.ReadFile(pathToModFile)
 	logError(err)
-	originalModContent = pwd.Dependency.GetModContent()
+	originalModContent := pwd.Dependency.GetModContent()
 	pwd.Dependency.SetModContent(modContent)
-	return originalModContent
+	// If not empty --> use the mod file and don't run go mod tidy
+	// If empty --> Run go mod tidy. Publish the package with empty mod file.
+	if !pwd.PatternMatched(pwd.regExp.GetNotEmptyModRegex()) {
+		log.Debug("The mod still empty after running 'go mod init' for:", pwd.Dependency.GetId())
+		pwd.prepareAndRunTidy(pathToModFile, originalModContent)
+		output, err = runGoModGraph()
+		return
+	} else {
+		log.Debug("Project mod file after init is not empty", pwd.Dependency.id)
+		output, err = runGoModGraph()
+		if err != nil {
+			log.Debug(fmt.Sprintf("Command go mod graph finished with the following error: %s for dependency %s", err.Error(), pwd.Dependency.GetId()))
+			// Graph failed after init. Lets return to empty mod and then run tidy on it and graph again.
+			// First create an empty mod.
+			logError(writeModContentToModFile(pathToModFile, originalModContent))
+			pwd.Dependency.SetModContent(originalModContent)
+			pwd.prepareAndRunTidy(pathToModFile, originalModContent)
+			output, err = runGoModGraph()
+		}
+	}
+	return
 }
 
 func (pwd *PackageWithDeps) useCachedMod(path string) error {
@@ -224,7 +256,7 @@ func (pwd *PackageWithDeps) getModPathInTemp(tempDir string) string {
 func (pwd *PackageWithDeps) publishDependencyAndPopulateTransitive(pathToModFile, targetRepo string, graphDependencies map[string]bool, cache *cache.DependenciesCache, serviceManager *artifactory.ArtifactoryServicesManager) error {
 	// If the mod is not empty, populate transitive dependencies
 	if len(graphDependencies) > 0 {
-		sumFileContent , sumFileStat, err := cmd.GetSumContentAndRemove(filepath.Dir(pathToModFile))
+		sumFileContent, sumFileStat, err := cmd.GetSumContentAndRemove(filepath.Dir(pathToModFile))
 		logError(err)
 		pwd.setTransitiveDependencies(targetRepo, graphDependencies, cache, serviceManager.GetConfig().GetArtDetails())
 		if len(sumFileContent) > 0 && sumFileStat != nil {
@@ -293,7 +325,10 @@ func (pwd *PackageWithDeps) setTransitiveDependencies(targetRepo string, graphDe
 					continue
 				}
 				// Check if this dependency exists in Artifactory.
-				client := httpclient.NewDefaultHttpClient()
+				client, err := httpclient.ClientBuilder().Build()
+				if err != nil {
+					continue
+				}
 				downloadedFromArtifactory, err := shouldDownloadFromArtifactory(module[0], module[1], targetRepo, auth, client)
 				logError(err)
 				if err != nil {

@@ -22,7 +22,6 @@ func PublishDependencies(goArg, targetRepo string, noRegistry bool, serviceManag
 
 	pd := &publishDependencies{wd: wd, dependenciesInterface: dependenciesInterface, targetRepo: targetRepo, serviceManager: serviceManager, goArg:goArg}
 	register(pd)
-
 	return ExecuteGo(goArg, targetRepo, noRegistry, serviceManager)
 }
 
@@ -34,6 +33,7 @@ type publishDependencies struct {
 	dependenciesInterface dependencies.GoPackage
 }
 
+// Resolve artifacts from VCS and publish the missing artifacts to Artifactory
 func (pd *publishDependencies) execute() error {
 	rootProjectDir, err := cmd.GetProjectRoot()
 	if err != nil {

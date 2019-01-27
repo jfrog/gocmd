@@ -9,3 +9,5 @@ require (
 	github.com/prometheus/procfs v0.0.0-20190104112138-b1a0a9a36d74 // indirect
 	golang.org/x/lint v0.0.0-20181217174547-8f45f776aaf1 // indirect
 )
+
+replace github.com/jfrog/jfrog-client-go => github.com/jfrog/jfrog-client-go v0.2.2-0.20190116093800-a4a3cf86a935

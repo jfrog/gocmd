@@ -92,7 +92,10 @@ func RunGo(goArg string) error {
 		return errorutils.CheckError(err)
 	}
 
-	prepareCmdOutputPattern()
+	err = prepareCmdOutputPattern()
+	if err != nil {
+		return err
+	}
 	_, err = gofrogcmd.RunCmdWithOutputParser(goCmd, protocolRegExp, notFoundRegExp, unrecognizedImportRegExp, unknownRevisionRegExp)
 	return errorutils.CheckError(err)
 }
@@ -138,7 +141,10 @@ func GetDependenciesGraph() (map[string]bool, error) {
 	}
 	goCmd.Command = []string{"mod", "graph"}
 
-	prepareCmdOutputPattern()
+	err = prepareCmdOutputPattern()
+	if err != nil {
+		return nil, err
+	}
 	output, err := gofrogcmd.RunCmdWithOutputParser(goCmd, protocolRegExp, notFoundRegExp, unrecognizedImportRegExp, unknownRevisionRegExp)
 	if len(output) != 0 {
 		log.Debug(output)

@@ -16,7 +16,7 @@ func DownloadFromVcsWithPopulation(targetRepo, goModEditMessage string, serviceM
 	}
 	register(&populateAndExecute{dependenciesInterface:dependenciesInterface, targetRepo:targetRepo, serviceManager:serviceManager})
 
-	return DownloadFromVcsAndPublishIfRequired()
+	return unsetGoProxyAndExecute()
 }
 
 type populateAndExecute struct {
@@ -25,6 +25,7 @@ type populateAndExecute struct {
 	dependenciesInterface dependencies.GoPackage
 }
 
+// Populates and publish the dependencies.
 func (pae *populateAndExecute) execute() error {
 	err := fileutils.CreateTempDirPath()
 	if err != nil {

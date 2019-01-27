@@ -56,7 +56,10 @@ func CollectProjectDependencies(targetRepo, rootProjectDir string, cache *cache.
 }
 
 func downloadDependencies(targetRepo string, cache *cache.DependenciesCache, depSlice map[string]bool, auth auth.ArtifactoryDetails) (map[string]bool, error) {
-	client := httpclient.NewDefaultHttpClient()
+	client, err := httpclient.ClientBuilder().Build()
+	if err != nil {
+		return nil, err
+	}
 	cacheDependenciesMap := cache.GetMap()
 	dependenciesMap := map[string]bool{}
 	for module := range depSlice {

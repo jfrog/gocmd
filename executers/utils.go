@@ -34,8 +34,8 @@ func execute(targetRepo string, failOnError bool, dependenciesInterface dependen
 
 func logFinishedMsg(cache *cache.DependenciesCache) {
 	log.Info(fmt.Sprintf("Done building and publishing %d go dependencies to Artifactory out of a total of %d dependencies.", cache.GetSuccesses(), cache.GetTotal()))
-
 }
+
 func collectDependencies(targetRepo, rootProjectDir string, cache *cache.DependenciesCache, serviceManager *artifactory.ArtifactoryServicesManager) (dependenciesToPublish map[string]bool, err error) {
 	dependenciesToPublish, err = dependencies.CollectProjectDependencies(targetRepo, rootProjectDir, cache, serviceManager.GetConfig().GetArtDetails())
 	return
@@ -64,6 +64,7 @@ func populateAndPublish(targetRepo, cachePath string, dependenciesInterface depe
 	return nil
 }
 
+// Execute Go with GoProxy and if fails, fallback.
 func ExecuteGo(goArg, targetRepo string, noRegistry bool, serviceManager *artifactory.ArtifactoryServicesManager) error {
 	if !noRegistry {
 		artDetails := serviceManager.GetConfig().GetArtDetails()
@@ -78,7 +79,7 @@ func ExecuteGo(goArg, targetRepo string, noRegistry bool, serviceManager *artifa
 	if err != nil {
 		if dependencyNotFoundInArtifactory(err, noRegistry) {
 			log.Info("Received", err.Error(), "from Artifactory. Trying download the dependencies from the VCS...")
-			err = DownloadFromVcsAndPublishIfRequired()
+			err = unsetGoProxyAndExecute()
 			if err != nil {
 				return err
 			}
@@ -97,8 +98,7 @@ func dependencyNotFoundInArtifactory(err error, noRegistry bool) bool {
 	return false
 }
 
-// Downloads all dependencies from VCS and publish them to Artifactory.
-func DownloadFromVcsAndPublishIfRequired() error {
+func unsetGoProxyAndExecute() error {
 	err := os.Unsetenv(cmd.GOPROXY)
 	if err != nil {
 		return err
