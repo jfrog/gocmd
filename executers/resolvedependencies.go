@@ -8,22 +8,22 @@ import (
 	"github.com/jfrog/jfrog-client-go/utils/log"
 )
 
-func Execute(goArg, targetRepo, url string) error {
-	register(&goCentralExecutor{goArg: goArg})
+func Execute(goArg, url, repo string) error {
+	register(&resolverExecuter{goArg: goArg})
 	serviceManager, err := createGoCentralServiceManager(url)
 	if err != nil {
 		return err
 	}
-	return ExecuteGo(goArg, targetRepo, false, serviceManager)
+	return ExecuteGo(goArg, repo, false, serviceManager)
 }
 
-type goCentralExecutor struct{
+type resolverExecuter struct{
 	goArg string
 }
 
 // Run Go without GOPROXY
-func (gce *goCentralExecutor) execute() error {
-	return cmd.RunGo(gce.goArg)
+func (re *resolverExecuter) execute() error {
+	return cmd.RunGo(re.goArg)
 }
 
 func createGoCentralServiceManager(url string) (*artifactory.ArtifactoryServicesManager, error) {
@@ -33,5 +33,5 @@ func createGoCentralServiceManager(url string) (*artifactory.ArtifactoryServices
 	if err != nil {
 		return nil, err
 	}
-	return artifactory.New(serviceConfig)
+	return artifactory.New(&artifactoryDetails, serviceConfig)
 }
