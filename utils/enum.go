@@ -1,4 +1,4 @@
-package golang
+package utils
 
 const (
 	noTidy                 = "no-tidy"

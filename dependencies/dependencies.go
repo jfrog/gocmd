@@ -2,7 +2,7 @@ package dependencies
 
 import (
 	"fmt"
-	"github.com/jfrog/gocmd/golang"
+	"github.com/jfrog/gocmd/utils/cache"
 	"github.com/jfrog/jfrog-client-go/artifactory"
 	"github.com/jfrog/jfrog-client-go/artifactory/buildinfo"
 	"github.com/jfrog/jfrog-client-go/artifactory/services/go"
@@ -60,7 +60,7 @@ func (dependencyPackage *Package) Init() error {
 	return nil
 }
 
-func (dependencyPackage *Package) PopulateModAndPublish(targetRepo string, cache *golang.DependenciesCache, serviceManager *artifactory.ArtifactoryServicesManager) error {
+func (dependencyPackage *Package) PopulateModAndPublish(targetRepo string, cache *cache.DependenciesCache, serviceManager *artifactory.ArtifactoryServicesManager) error {
 	published, _ := cache.GetMap()[dependencyPackage.GetId()]
 	if !published {
 		return dependencyPackage.prepareAndPublish(targetRepo, cache, serviceManager)
@@ -71,7 +71,7 @@ func (dependencyPackage *Package) PopulateModAndPublish(targetRepo string, cache
 }
 
 // Prepare for publishing and publish the dependency to Artifactory
-func (dependencyPackage *Package) prepareAndPublish(targetRepo string, cache *golang.DependenciesCache, serviceManager *artifactory.ArtifactoryServicesManager) error {
+func (dependencyPackage *Package) prepareAndPublish(targetRepo string, cache *cache.DependenciesCache, serviceManager *artifactory.ArtifactoryServicesManager) error {
 	successOutOfTotal := fmt.Sprintf("%d/%d", cache.GetSuccesses()+1, cache.GetTotal())
 	err := dependencyPackage.Publish(successOutOfTotal, targetRepo, serviceManager)
 	if err != nil {

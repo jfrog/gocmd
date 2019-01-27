@@ -3,7 +3,8 @@ package dependencies
 import (
 	"bytes"
 	"fmt"
-	"github.com/jfrog/gocmd/golang"
+	"github.com/jfrog/gocmd/utils/cache"
+	"github.com/jfrog/gocmd/utils/cmd"
 	gofrogio "github.com/jfrog/gofrog/io"
 	"github.com/jfrog/jfrog-client-go/artifactory/auth"
 	"github.com/jfrog/jfrog-client-go/artifactory/buildinfo"
@@ -28,7 +29,7 @@ const (
 )
 
 // Collects the dependencies of the project
-func CollectProjectDependencies(targetRepo string, cache *golang.DependenciesCache, auth auth.ArtifactoryDetails) (map[string]bool, error) {
+func CollectProjectDependencies(targetRepo, rootProjectDir string, cache *cache.DependenciesCache, auth auth.ArtifactoryDetails) (map[string]bool, error) {
 	dependenciesMap, err := getDependenciesGraphWithFallback(targetRepo, auth)
 	if err != nil {
 		return nil, err
@@ -40,6 +41,13 @@ func CollectProjectDependencies(targetRepo string, cache *golang.DependenciesCac
 
 	// Merge replaceDependencies with dependenciesToPublish
 	mergeReplaceDependenciesWithGraphDependencies(replaceDependencies, dependenciesMap)
+	sumFileContent, sumFileStat, err := cmd.GetSumContentAndRemove(rootProjectDir)
+	if err != nil {
+		return nil, err
+	}
+	if len(sumFileContent) > 0 && sumFileStat != nil {
+		defer cmd.RestoreSumFile(rootProjectDir, sumFileContent, sumFileStat)
+	}
 	projectDependencies, err := downloadDependencies(targetRepo, cache, dependenciesMap, auth)
 	if err != nil {
 		return projectDependencies, err
@@ -47,8 +55,11 @@ func CollectProjectDependencies(targetRepo string, cache *golang.DependenciesCac
 	return projectDependencies, nil
 }
 
-func downloadDependencies(targetRepo string, cache *golang.DependenciesCache, depSlice map[string]bool, auth auth.ArtifactoryDetails) (map[string]bool, error) {
-	client := httpclient.NewDefaultHttpClient()
+func downloadDependencies(targetRepo string, cache *cache.DependenciesCache, depSlice map[string]bool, auth auth.ArtifactoryDetails) (map[string]bool, error) {
+	client, err := httpclient.ClientBuilder().Build()
+	if err != nil {
+		return nil, err
+	}
 	cacheDependenciesMap := cache.GetMap()
 	dependenciesMap := map[string]bool{}
 	for module := range depSlice {
@@ -86,20 +97,12 @@ func performHeadRequest(auth auth.ArtifactoryDetails, client *httpclient.HttpCli
 }
 
 // Creating dependency with the mod file in the temp directory
-func createDependencyWithMod(dep Package) (path string, err error) {
-	tempDir, err := fileutils.GetTempDirPath()
+func createDependencyInTemp(zipPath string) (tempDir string, err error) {
+	tempDir, err = fileutils.GetTempDirPath()
 	if err != nil {
 		return "", err
 	}
-	moduleId := dep.GetId()
-	moduleInfo := strings.Split(moduleId, ":")
-
-	moduleInfo[0] = replaceExclamationMarkWithUpperCase(moduleInfo[0])
-	moduleId = strings.Join(moduleInfo, ":")
-	modulePath := strings.Replace(moduleId, ":", "@", 1)
-	path = filepath.Join(tempDir, modulePath, "go.mod")
-
-	multiReader, err := multifilereader.NewMultiFileReaderAt([]string{dep.GetZipPath()})
+	multiReader, err := multifilereader.NewMultiFileReaderAt([]string{zipPath})
 	if err != nil {
 		return "", errorutils.CheckError(err)
 	}
@@ -107,11 +110,7 @@ func createDependencyWithMod(dep Package) (path string, err error) {
 	if err != nil {
 		return "", errorutils.CheckError(err)
 	}
-	err = ioutil.WriteFile(path, dep.GetModContent(), 0700)
-	if err != nil {
-		return path, errorutils.CheckError(err)
-	}
-	return path, nil
+	return tempDir, nil
 }
 
 func replaceExclamationMarkWithUpperCase(moduleName string) string {
@@ -135,54 +134,17 @@ func downloadDependency(downloadFromArtifactory bool, fullDependencyName, target
 	var err error
 	if downloadFromArtifactory {
 		log.Debug("Downloading dependency from Artifactory:", fullDependencyName)
-		err = golang.SetGoProxyEnvVar(auth.GetUrl(), auth.GetUser(), auth.GetPassword(), targetRepo)
+		err = cmd.SetGoProxyEnvVar(auth.GetUrl(), auth.GetUser(), auth.GetPassword(), targetRepo)
 	} else {
 		log.Debug("Downloading dependency from VCS:", fullDependencyName)
-		err = os.Unsetenv(golang.GOPROXY)
+		err = os.Unsetenv(cmd.GOPROXY)
 	}
 	if errorutils.CheckError(err) != nil {
 		return err
 	}
 
-	err = golang.DownloadDependency(fullDependencyName)
+	err = cmd.DownloadDependency(fullDependencyName)
 	return err
-}
-
-func populateModAndGetDependenciesGraph(path string, shouldRunGoModCommand, shouldRunGoGraph bool) (output map[string]bool, err error) {
-	err = os.Chdir(filepath.Dir(path))
-	if errorutils.CheckError(err) != nil {
-		return
-	}
-	log.Debug("Preparing to populate mod", filepath.Dir(path))
-	// Remove go.sum file to avoid checksum conflicts with the old go.sum
-	goSum := filepath.Join(filepath.Dir(path), "go.sum")
-	exists, err := fileutils.IsFileExists(goSum, false)
-	if err != nil {
-		return
-	}
-
-	if exists {
-		err = os.Remove(goSum)
-		if errorutils.CheckError(err) != nil {
-			return
-		}
-	}
-
-	if shouldRunGoModCommand {
-		// Running go mod tidy command
-		err = golang.RunGoModTidy()
-		if err != nil {
-			return
-		}
-	}
-	if shouldRunGoGraph {
-		// Running go mod graph command
-		output, err = golang.GetDependenciesGraph()
-		if err != nil {
-			return
-		}
-	}
-	return
 }
 
 // Downloads the mod file from Artifactory to the Go cache
@@ -190,7 +152,7 @@ func downloadModFileFromArtifactoryToLocalCache(cachePath, targetRepo, name, ver
 	pathToModuleCache := filepath.Join(cachePath, name, "@v")
 	dirExists, err := fileutils.IsDirExists(pathToModuleCache, false)
 	if err != nil {
-		log.Error("Received an error:", err)
+		log.Error(fmt.Sprintf("Received an error: %s for %s@%s", err, name, version))
 		return ""
 	}
 
@@ -206,7 +168,7 @@ func downloadModFileFromArtifactoryToLocalCache(cachePath, targetRepo, name, ver
 		}
 		resp, err := client.DownloadFile(downloadFileDetails, "", auth.CreateHttpClientDetails(), 3, false)
 		if err != nil {
-			log.Error("Received an error:", err)
+			log.Error(fmt.Sprintf("Received an error %s downloading a file: %s to the local path: %s", err.Error(), downloadFileDetails.FileName, downloadFileDetails.LocalPath))
 			return ""
 		}
 
@@ -217,17 +179,17 @@ func downloadModFileFromArtifactoryToLocalCache(cachePath, targetRepo, name, ver
 }
 
 func GetRegex() (regExp *RegExp, err error) {
-	emptyRegex, err := golang.GetRegExp(`^\s*require (?:[\(\w\.@:%_\+-.~#?&]?.+)`)
+	emptyRegex, err := cmd.GetRegExp(`^\s*require (?:[\(\w\.@:%_\+-.~#?&]?.+)`)
 	if err != nil {
 		return
 	}
 
-	indirectRegex, err := golang.GetRegExp(`(// indirect)$`)
+	indirectRegex, err := cmd.GetRegExp(`(// indirect)$`)
 	if err != nil {
 		return
 	}
 
-	editedByJFrogCli, err := golang.GetRegExp(`^(// Edited by JFrog CLI on)`)
+	generatedBy, err := cmd.GetRegExp(`^(// )`)
 	if err != nil {
 		return
 	}
@@ -235,7 +197,7 @@ func GetRegex() (regExp *RegExp, err error) {
 	regExp = &RegExp{
 		notEmptyModRegex: emptyRegex,
 		indirectRegex:    indirectRegex,
-		editedByJFrogCli: editedByJFrogCli,
+		generatedBy:      generatedBy,
 	}
 	return
 }
@@ -385,7 +347,7 @@ func getPackagePathIfExists(cachePath, dependencyName, version string) (zipPath 
 }
 
 func getGOPATH() (string, error) {
-	goCmd, err := golang.NewCmd()
+	goCmd, err := cmd.NewCmd()
 	if err != nil {
 		return "", err
 	}
@@ -425,11 +387,11 @@ func mergeReplaceDependenciesWithGraphDependencies(replaceDeps []string, graphDe
 }
 
 func getReplaceDependencies() ([]string, error) {
-	replaceRegExp, err := golang.GetRegExp(`\s*replace (?:[\(\w\.@:%_\+-.~#?&]?.+)`)
+	replaceRegExp, err := cmd.GetRegExp(`\s*replace (?:[\(\w\.@:%_\+-.~#?&]?.+)`)
 	if err != nil {
 		return nil, err
 	}
-	rootDir, err := golang.GetProjectRoot()
+	rootDir, err := cmd.GetProjectRoot()
 	if err != nil {
 		return nil, err
 	}
@@ -454,7 +416,7 @@ func getDependenciesGraphWithFallback(targetRepo string, auth auth.ArtifactoryDe
 			return nil, err
 		}
 		usedProxy = !usedProxy
-		dependenciesMap, err = golang.GetDependenciesGraph()
+		dependenciesMap, err = cmd.GetDependenciesGraph()
 		if err == nil {
 			break
 		}
@@ -475,10 +437,10 @@ func getDependenciesGraphWithFallback(targetRepo string, auth auth.ArtifactoryDe
 func setOrUnsetGoProxy(usedProxy bool, targetRepo string, auth auth.ArtifactoryDetails) error {
 	if !usedProxy {
 		log.Debug("Trying download the dependencies from Artifactory...")
-		return golang.SetGoProxyEnvVar(auth.GetUrl(), auth.GetUser(), auth.GetPassword(), targetRepo)
+		return cmd.SetGoProxyEnvVar(auth.GetUrl(), auth.GetUser(), auth.GetPassword(), targetRepo)
 	} else {
 		log.Debug("Trying download the dependencies from the VCS...")
-		return errorutils.CheckError(os.Unsetenv(golang.GOPROXY))
+		return errorutils.CheckError(os.Unsetenv(cmd.GOPROXY))
 	}
 }
 
@@ -499,6 +461,44 @@ func logDebug(err error, usedProxy bool) {
 		message += " VCS."
 	}
 	log.Debug(message)
+}
+
+func populateModWithTidy(path string) error {
+	err := os.Chdir(filepath.Dir(path))
+	if errorutils.CheckError(err) != nil {
+		return err
+	}
+	log.Debug("Preparing to populate mod", filepath.Dir(path))
+	err = removeGoSum(path)
+	logError(err)
+	// Running go mod tidy command
+	err = cmd.RunGoModTidy()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func removeGoSum(path string) error {
+	// Remove go.sum file to avoid checksum conflicts with the old go.sum
+	goSum := filepath.Join(filepath.Dir(path), "go.sum")
+	exists, err := fileutils.IsFileExists(goSum, false)
+	if err != nil {
+		return err
+	}
+	if exists {
+		err = os.Remove(goSum)
+		if errorutils.CheckError(err) != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runGoModGraph() (output map[string]bool, err error) {
+	// Running go mod graph command
+	return cmd.GetDependenciesGraph()
 }
 
 type previousTries struct {

@@ -1,11 +1,15 @@
-package golang
+package cmd
 
 import (
 	"errors"
 	"fmt"
 	gofrogio "github.com/jfrog/gofrog/io"
+	"github.com/jfrog/jfrog-client-go/utils/errorutils"
+	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
 	"github.com/jfrog/jfrog-client-go/utils/log"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 )
@@ -85,3 +89,74 @@ func GetRegExp(regex string) (*regexp.Regexp, error) {
 
 	return regExp, nil
 }
+
+func GetSumContentAndRemove(rootProjectDir string) (sumFileContent []byte, sumFileStat os.FileInfo, err error){
+	sumFileExists, err := fileutils.IsFileExists(filepath.Join(rootProjectDir, "go.sum"), false)
+	if err != nil {
+		return
+	}
+	if sumFileExists {
+		log.Debug("Sum file exists:", rootProjectDir)
+		sumFileContent, sumFileStat, err = GetFileDetails(filepath.Join(rootProjectDir, "go.sum"))
+		if err != nil {
+			return
+		}
+		log.Debug("Removing file:", filepath.Join(rootProjectDir, "go.sum"))
+		err = os.Remove(filepath.Join(rootProjectDir, "go.sum"))
+		if err != nil {
+			return
+		}
+		return
+	}
+	return
+}
+
+func RestoreSumFile(rootProjectDir string, sumFileContent []byte, sumFileStat os.FileInfo) error {
+	log.Debug("Restoring file:", filepath.Join(rootProjectDir, "go.sum"))
+	err := ioutil.WriteFile(filepath.Join(rootProjectDir, "go.sum"), sumFileContent, sumFileStat.Mode())
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func GetFileDetails(filePath string) (modFileContent []byte, modFileStat os.FileInfo, err error) {
+	modFileStat, err = os.Stat(filePath)
+	if errorutils.CheckError(err) != nil {
+		return
+	}
+	modFileContent, err = ioutil.ReadFile(filePath)
+	errorutils.CheckError(err)
+	return
+}
+
+func outputToMap(output string) map[string]bool {
+	lineOutput := strings.Split(output, "\n")
+	var result []string
+	mapOfDeps := map[string]bool{}
+	for _, line := range lineOutput {
+		splitLine := strings.Split(line, " ")
+		if len(splitLine) == 2 {
+			mapOfDeps[splitLine[1]] = true
+			result = append(result, splitLine[1])
+		}
+	}
+	return mapOfDeps
+}
+
+func signModFile(modEditMessage string) error {
+	rootDir, err := GetProjectRoot()
+	if err != nil {
+		return err
+	}
+	modFilePath := filepath.Join(rootDir, "go.mod")
+	stat, err := os.Stat(modFilePath)
+	if err != nil {
+		return errorutils.CheckError(err)
+	}
+	modFileContent, err := ioutil.ReadFile(modFilePath)
+	newContent := append([]byte(modEditMessage+"\n\n"), modFileContent...)
+	err = ioutil.WriteFile(modFilePath, newContent, stat.Mode())
+	return errorutils.CheckError(err)
+}
+
