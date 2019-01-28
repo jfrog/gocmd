@@ -78,7 +78,7 @@ func ExecuteGo(goArg, targetRepo string, noRegistry bool, serviceManager *artifa
 
 	if err != nil {
 		if dependencyNotFoundInArtifactory(err, noRegistry) {
-			log.Info("Received", err.Error(), "from Artifactory. Trying download the dependencies from the VCS...")
+			log.Info("Received", err.Error(), "from proxy. Trying to download dependencies from VCS...")
 			err = unsetGoProxyAndExecute()
 			if err != nil {
 				return err
