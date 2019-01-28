@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
 const GOPROXY = "GOPROXY"
@@ -66,9 +67,17 @@ func SetGoProxyEnvVar(artifactoryUrl, username, password, repoName string) error
 	if username != "" && password != "" {
 		rtUrl.User = url.UserPassword(username, password)
 	}
-	rtUrl.Path += "api/go/" + repoName
+
+	if !isGoCenterUrl(artifactoryUrl) {
+		rtUrl.Path += "api/go/" + repoName
+	}
+
 	err = os.Setenv(GOPROXY, rtUrl.String())
 	return errorutils.CheckError(err)
+}
+
+func isGoCenterUrl(url string) bool {
+	return strings.HasPrefix(url, "https://gocenter.io")
 }
 
 func GetGoVersion() (string, error) {
