@@ -9,11 +9,9 @@ import (
 	"github.com/mattn/go-shellwords"
 	"io"
 	"io/ioutil"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 )
 
 const GOPROXY = "GOPROXY"
@@ -57,27 +55,6 @@ type Cmd struct {
 	CommandFlags []string
 	StrWriter    io.WriteCloser
 	ErrWriter    io.WriteCloser
-}
-
-func SetGoProxyEnvVar(artifactoryUrl, username, password, repoName string) error {
-	rtUrl, err := url.Parse(artifactoryUrl)
-	if err != nil {
-		return errorutils.CheckError(err)
-	}
-	if username != "" && password != "" {
-		rtUrl.User = url.UserPassword(username, password)
-	}
-
-	if !isGoCenterUrl(artifactoryUrl) {
-		rtUrl.Path += "api/go/" + repoName
-	}
-
-	err = os.Setenv(GOPROXY, rtUrl.String())
-	return errorutils.CheckError(err)
-}
-
-func isGoCenterUrl(url string) bool {
-	return strings.HasPrefix(url, "https://gocenter.io")
 }
 
 func GetGoVersion() (string, error) {
@@ -192,7 +169,7 @@ func RunGoModTidy() error {
 	return err
 }
 
-func RunGoModInit(moduleName, modEditMessage string) error {
+func RunGoModInit(moduleName string) error {
 	pwd, err := os.Getwd()
 	if err != nil {
 		return err
@@ -206,10 +183,7 @@ func RunGoModInit(moduleName, modEditMessage string) error {
 
 	goCmd.Command = []string{"mod", "init", moduleName}
 	_, err = gofrogcmd.RunCmdWithOutputParser(goCmd)
-	if err != nil {
-		return err
-	}
-	return signModFile(modEditMessage)
+	return err
 }
 
 // Returns the root dir where the go.mod located.

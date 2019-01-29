@@ -1,10 +1,13 @@
 package executers
 
 import (
-	"github.com/jfrog/gocmd/dependencies"
+	"fmt"
 	"github.com/jfrog/gocmd/utils/cache"
 	"github.com/jfrog/gocmd/utils/cmd"
 	"github.com/jfrog/jfrog-client-go/artifactory"
+	"github.com/jfrog/jfrog-client-go/artifactory/auth"
+	"github.com/jfrog/jfrog-client-go/artifactory/buildinfo"
+	"github.com/jfrog/jfrog-client-go/artifactory/services/go"
 	"github.com/jfrog/jfrog-client-go/utils/errorutils"
 	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
 	"github.com/jfrog/jfrog-client-go/utils/log"
@@ -18,11 +21,10 @@ func PublishDependencies(goArg, targetRepo string, noRegistry bool, serviceManag
 	if err != nil {
 		return errorutils.CheckError(err)
 	}
-	dependenciesInterface := &dependencies.Package{}
-
-	pd := &publishDependencies{wd: wd, dependenciesInterface: dependenciesInterface, targetRepo: targetRepo, serviceManager: serviceManager, goArg:goArg}
+	dependenciesInterface := &Package{}
+	pd := &publishDependencies{wd: wd, dependenciesInterface: dependenciesInterface, targetRepo: targetRepo, serviceManager: serviceManager, goArg: goArg}
 	register(pd)
-	return ExecuteGo(goArg, targetRepo, noRegistry, serviceManager)
+	return ExecuteGo(goArg, noRegistry, serviceManager)
 }
 
 type publishDependencies struct {
@@ -30,7 +32,7 @@ type publishDependencies struct {
 	targetRepo            string
 	goArg                 string
 	serviceManager        *artifactory.ArtifactoryServicesManager
-	dependenciesInterface dependencies.GoPackage
+	dependenciesInterface GoPackage
 }
 
 // Resolve artifacts from VCS and publish the missing artifacts to Artifactory
@@ -40,7 +42,7 @@ func (pd *publishDependencies) execute() error {
 		return err
 	}
 	cache := cache.DependenciesCache{}
-	dependenciesToPublish, err := collectDependencies(pd.targetRepo, rootProjectDir, &cache, pd.serviceManager)
+	dependenciesToPublish, err := collectProjectDependencies(pd.targetRepo, rootProjectDir, &cache, pd.serviceManager.GetConfig().GetArtDetails())
 	if err != nil || len(dependenciesToPublish) == 0 {
 		return err
 	}
@@ -60,6 +62,10 @@ func (pd *publishDependencies) execute() error {
 	return cmd.RunGo(pd.goArg)
 }
 
+func (pd *publishDependencies) SetGoProxyEnvVar(details auth.ArtifactoryDetails) error {
+	return setGoProxyEnvVar(pd.targetRepo, details)
+}
+
 func removeGoSumFile(wd, rootDir string) error {
 	log.Debug("Changing back to the working directory", wd)
 	err := os.Chdir(wd)
@@ -76,4 +82,88 @@ func removeGoSumFile(wd, rootDir string) error {
 		return errorutils.CheckError(os.Remove(goSumFile))
 	}
 	return nil
+}
+
+// Represent go dependency package.
+type Package struct {
+	buildInfoDependencies []buildinfo.Dependency
+	id                    string
+	modContent            []byte
+	zipPath               string
+	modPath               string
+	version               string
+}
+
+func (dependencyPackage *Package) New(cachePath string, dep Package) GoPackage {
+	dependencyPackage.modContent = dep.modContent
+	dependencyPackage.zipPath = dep.zipPath
+	dependencyPackage.version = dep.version
+	dependencyPackage.id = dep.id
+	dependencyPackage.buildInfoDependencies = dep.buildInfoDependencies
+	dependencyPackage.modPath = dep.modPath
+	return dependencyPackage
+}
+
+func (dependencyPackage *Package) GetId() string {
+	return dependencyPackage.id
+}
+
+func (dependencyPackage *Package) GetModContent() []byte {
+	return dependencyPackage.modContent
+}
+
+func (dependencyPackage *Package) SetModContent(modContent []byte) {
+	dependencyPackage.modContent = modContent
+}
+
+func (dependencyPackage *Package) GetZipPath() string {
+	return dependencyPackage.zipPath
+}
+
+// Init the dependency information if needed.
+func (dependencyPackage *Package) Init() error {
+	return nil
+}
+
+func (dependencyPackage *Package) PopulateModAndPublish(targetRepo string, cache *cache.DependenciesCache, serviceManager *artifactory.ArtifactoryServicesManager) error {
+	published, _ := cache.GetMap()[dependencyPackage.GetId()]
+	if !published {
+		return dependencyPackage.prepareAndPublish(targetRepo, cache, serviceManager)
+	} else {
+		log.Debug(fmt.Sprintf("Dependency %s was published previosly to Artifactory", dependencyPackage.GetId()))
+	}
+	return nil
+}
+
+// Prepare for publishing and publish the dependency to Artifactory
+func (dependencyPackage *Package) prepareAndPublish(targetRepo string, cache *cache.DependenciesCache, serviceManager *artifactory.ArtifactoryServicesManager) error {
+	successOutOfTotal := fmt.Sprintf("%d/%d", cache.GetSuccesses()+1, cache.GetTotal())
+	err := dependencyPackage.Publish(successOutOfTotal, targetRepo, serviceManager)
+	if err != nil {
+		cache.IncrementFailures()
+		return err
+	}
+	cache.IncrementSuccess()
+	return nil
+}
+
+func (dependencyPackage *Package) Publish(summary string, targetRepo string, servicesManager *artifactory.ArtifactoryServicesManager) error {
+	message := fmt.Sprintf("Publishing: %s to %s", dependencyPackage.id, targetRepo)
+	if summary != "" {
+		message += ":" + summary
+	}
+	log.Info(message)
+	params := _go.NewGoParams()
+	params.ZipPath = dependencyPackage.zipPath
+	params.ModContent = dependencyPackage.modContent
+	params.Version = dependencyPackage.version
+	params.TargetRepo = targetRepo
+	params.ModuleId = dependencyPackage.id
+	params.ModPath = dependencyPackage.modPath
+
+	return servicesManager.PublishGoProject(params)
+}
+
+func (dependencyPackage *Package) Dependencies() []buildinfo.Dependency {
+	return dependencyPackage.buildInfoDependencies
 }

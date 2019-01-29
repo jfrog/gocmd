@@ -1,11 +1,10 @@
-package dependencies
+package executers
 
 import (
 	"bytes"
 	"fmt"
 	"github.com/jfrog/gocmd/utils/cache"
 	"github.com/jfrog/gocmd/utils/cmd"
-	gofrogio "github.com/jfrog/gofrog/io"
 	"github.com/jfrog/jfrog-client-go/artifactory/auth"
 	"github.com/jfrog/jfrog-client-go/artifactory/buildinfo"
 	"github.com/jfrog/jfrog-client-go/httpclient"
@@ -29,8 +28,8 @@ const (
 )
 
 // Collects the dependencies of the project
-func CollectProjectDependencies(targetRepo, rootProjectDir string, cache *cache.DependenciesCache, auth auth.ArtifactoryDetails) (map[string]bool, error) {
-	dependenciesMap, err := getDependenciesGraphWithFallback(targetRepo, auth)
+func collectProjectDependencies(targetRepo, rootProjectDir string, cache *cache.DependenciesCache, auth auth.ArtifactoryDetails) (map[string]bool, error) {
+	dependenciesMap, err := getDependenciesGraphWithFallback(auth)
 	if err != nil {
 		return nil, err
 	}
@@ -71,11 +70,11 @@ func downloadDependencies(targetRepo string, cache *cache.DependenciesCache, dep
 
 		if resp.StatusCode == 200 {
 			cacheDependenciesMap[getDependencyName(nameAndVersion[0])+":"+nameAndVersion[1]] = true
-			err = downloadDependency(true, module, targetRepo, auth)
+			err = downloadDependency(true, module, auth)
 			dependenciesMap[module] = true
 		} else if resp.StatusCode == 404 {
 			cacheDependenciesMap[getDependencyName(nameAndVersion[0])+":"+nameAndVersion[1]] = false
-			err = downloadDependency(false, module, "", nil)
+			err = downloadDependency(false, module, nil)
 			dependenciesMap[module] = false
 		}
 
@@ -130,11 +129,18 @@ func replaceExclamationMarkWithUpperCase(moduleName string) string {
 }
 
 // Runs the go mod download command. Should set first the environment variable of GoProxy
-func downloadDependency(downloadFromArtifactory bool, fullDependencyName, targetRepo string, auth auth.ArtifactoryDetails) error {
+func downloadDependency(downloadFromArtifactory bool, fullDependencyName string, auth auth.ArtifactoryDetails) error {
 	var err error
 	if downloadFromArtifactory {
 		log.Debug("Downloading dependency from Artifactory:", fullDependencyName)
-		err = cmd.SetGoProxyEnvVar(auth.GetUrl(), auth.GetUser(), auth.GetPassword(), targetRepo)
+		executor := GetCompatibleExecutor()
+		if executor == nil {
+			return errorutils.CheckError(errors.New("No executors were registered."))
+		}
+		err := executor.SetGoProxyEnvVar(auth)
+		if err != nil {
+			return err
+		}
 	} else {
 		log.Debug("Downloading dependency from VCS:", fullDependencyName)
 		err = os.Unsetenv(cmd.GOPROXY)
@@ -178,33 +184,9 @@ func downloadModFileFromArtifactoryToLocalCache(cachePath, targetRepo, name, ver
 	return ""
 }
 
-func GetRegex() (regExp *RegExp, err error) {
-	emptyRegex, err := cmd.GetRegExp(`^\s*require (?:[\(\w\.@:%_\+-.~#?&]?.+)`)
-	if err != nil {
-		return
-	}
-
-	indirectRegex, err := cmd.GetRegExp(`(// indirect)$`)
-	if err != nil {
-		return
-	}
-
-	generatedBy, err := cmd.GetRegExp(`^(// )`)
-	if err != nil {
-		return
-	}
-
-	regExp = &RegExp{
-		notEmptyModRegex: emptyRegex,
-		indirectRegex:    indirectRegex,
-		generatedBy:      generatedBy,
-	}
-	return
-}
-
-func downloadAndCreateDependency(cachePath, name, version, fullDependencyName, targetRepo string, downloadedFromArtifactory bool, auth auth.ArtifactoryDetails) (*Package, error) {
+func downloadAndCreateDependency(cachePath, name, version, fullDependencyName string, downloadedFromArtifactory bool, auth auth.ArtifactoryDetails) (*Package, error) {
 	// Dependency is missing within the cache. Need to download it...
-	err := downloadDependency(downloadedFromArtifactory, fullDependencyName, targetRepo, auth)
+	err := downloadDependency(downloadedFromArtifactory, fullDependencyName, auth)
 	if err != nil {
 		return nil, err
 	}
@@ -214,12 +196,6 @@ func downloadAndCreateDependency(cachePath, name, version, fullDependencyName, t
 		return nil, err
 	}
 	return dep, nil
-}
-
-func logError(err error) {
-	if err != nil {
-		log.Error("Received an error:", err)
-	}
 }
 
 func shouldDownloadFromArtifactory(module, version, targetRepo string, auth auth.ArtifactoryDetails, client *httpclient.HttpClient) (bool, error) {
@@ -346,19 +322,6 @@ func getPackagePathIfExists(cachePath, dependencyName, version string) (zipPath 
 	return zipPath, nil
 }
 
-func getGOPATH() (string, error) {
-	goCmd, err := cmd.NewCmd()
-	if err != nil {
-		return "", err
-	}
-	goCmd.Command = []string{"env", "GOPATH"}
-	output, err := gofrogio.RunCmdOutput(goCmd)
-	if errorutils.CheckError(err) != nil {
-		return "", fmt.Errorf("Could not find GOPATH env: %s", err.Error())
-	}
-	return strings.TrimSpace(string(output)), nil
-}
-
 func mergeReplaceDependenciesWithGraphDependencies(replaceDeps []string, graphDeps map[string]bool) {
 	for _, replaceLine := range replaceDeps {
 		// Remove unnecessary spaces
@@ -405,13 +368,13 @@ func getReplaceDependencies() ([]string, error) {
 }
 
 // Runs go mod graph command with fallback.
-func getDependenciesGraphWithFallback(targetRepo string, auth auth.ArtifactoryDetails) (map[string]bool, error) {
+func getDependenciesGraphWithFallback(auth auth.ArtifactoryDetails) (map[string]bool, error) {
 	dependenciesMap := map[string]bool{}
 	modulesWithErrors := map[string]previousTries{}
 	usedProxy := true
 	for true {
 		// Configuring each run to use Artifactory/VCS
-		err := setOrUnsetGoProxy(usedProxy, targetRepo, auth)
+		err := setOrUnsetGoProxy(usedProxy, auth)
 		if err != nil {
 			return nil, err
 		}
@@ -434,10 +397,18 @@ func getDependenciesGraphWithFallback(targetRepo string, auth auth.ArtifactoryDe
 	return dependenciesMap, nil
 }
 
-func setOrUnsetGoProxy(usedProxy bool, targetRepo string, auth auth.ArtifactoryDetails) error {
+func setOrUnsetGoProxy(usedProxy bool, auth auth.ArtifactoryDetails) error {
 	if !usedProxy {
 		log.Debug("Trying download the dependencies from Artifactory...")
-		return cmd.SetGoProxyEnvVar(auth.GetUrl(), auth.GetUser(), auth.GetPassword(), targetRepo)
+		executor := GetCompatibleExecutor()
+		if executor == nil {
+			return errorutils.CheckError(errors.New("No executors were registered."))
+		}
+		err := executor.SetGoProxyEnvVar(auth)
+		if err != nil {
+			return err
+		}
+		return nil
 	} else {
 		log.Debug("Trying download the dependencies from the VCS...")
 		return errorutils.CheckError(os.Unsetenv(cmd.GOPROXY))
@@ -451,16 +422,6 @@ func getModuleAndVersion(usedProxy bool, err error) (string, error) {
 		return "", errorutils.CheckError(errors.New("Missing module name and version in the error message " + err.Error()))
 	}
 	return strings.TrimSpace(splittedLine[1]), nil
-}
-
-func logDebug(err error, usedProxy bool) {
-	message := "Received " + err.Error() + " from"
-	if usedProxy {
-		message += " Artifactory."
-	} else {
-		message += " VCS."
-	}
-	log.Debug(message)
 }
 
 func populateModWithTidy(path string) error {
@@ -512,4 +473,14 @@ func (pt *previousTries) setTriedFrom(usedProxy bool) {
 	} else {
 		pt.triedFromVCS = true
 	}
+}
+
+// Download the dependencies from VCS and publish them to Artifactory.
+func getDependencies(dependenciesToPublish map[string]bool) (cachePath string, packageDependencies []Package, err error) {
+	cachePath, err = GetCachePath()
+	if err != nil {
+		return
+	}
+	packageDependencies, err = GetDependencies(cachePath, dependenciesToPublish)
+	return
 }
