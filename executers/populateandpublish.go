@@ -17,48 +17,7 @@ import (
 	"strings"
 )
 
-func DownloadFromVcsWithPopulation(targetRepo, goModEditMessage string, serviceManager *artifactory.ArtifactoryServicesManager) error {
-	dependenciesInterface := &PackageWithDeps{GoModEditMessage: goModEditMessage}
-	err := dependenciesInterface.Init()
-	if err != nil {
-		return err
-	}
-	register(&populateAndExecute{dependenciesInterface: dependenciesInterface, targetRepo: targetRepo, serviceManager: serviceManager})
-
-	return unsetGoProxyAndExecute()
-}
-
-type populateAndExecute struct {
-	targetRepo            string
-	serviceManager        *artifactory.ArtifactoryServicesManager
-	dependenciesInterface GoPackage
-}
-
-// Populates and publish the dependencies.
-func (pae *populateAndExecute) execute() error {
-	err := fileutils.CreateTempDirPath()
-	if err != nil {
-		return err
-	}
-	defer fileutils.RemoveTempDir()
-	rootProjectDir, err := cmd.GetProjectRoot()
-	if err != nil {
-		return err
-	}
-	cache := cache.DependenciesCache{}
-	dependenciesToPublish, err := collectProjectDependencies(pae.targetRepo, rootProjectDir, &cache, pae.serviceManager.GetConfig().GetArtDetails())
-	if err != nil || len(dependenciesToPublish) == 0 {
-		return err
-	}
-	execute(pae.targetRepo, false, pae.dependenciesInterface, &cache, dependenciesToPublish, pae.serviceManager)
-	return nil
-}
-
-func (pae *populateAndExecute) SetGoProxyEnvVar(details auth.ArtifactoryDetails) error {
-	return setGoProxyEnvVar(pae.targetRepo, details)
-}
-
-// Represents go dependency when running with deps-tidy set to true.
+// Represents go dependency when running with go-recursive-publish set to true.
 type PackageWithDeps struct {
 	Dependency             *Package
 	transitiveDependencies []PackageWithDeps
@@ -68,6 +27,22 @@ type PackageWithDeps struct {
 	cachePath              string
 	GoModEditMessage       string
 	originalModContent     []byte
+}
+
+// Populates and publish the dependencies.
+func PopulateDependenciesAndPublish(targetRepo, goModEditMessage string, serviceManager *artifactory.ArtifactoryServicesManager) error {
+	err := fileutils.CreateTempDirPath()
+	if err != nil {
+		return err
+	}
+	defer fileutils.RemoveTempDir()
+	pwd := &PackageWithDeps{GoModEditMessage: goModEditMessage}
+	err = pwd.Init()
+	if err != nil {
+		return err
+	}
+	collectDependenciesAndPublish(targetRepo, false, pwd, serviceManager)
+	return nil
 }
 
 // Creates a new dependency
@@ -251,7 +226,7 @@ func (pwd *PackageWithDeps) useCachedMod(path string) error {
 }
 
 func (pwd *PackageWithDeps) getModPathAndUnzipDependency(path string) (string, error) {
-	err := os.Unsetenv(cmd.GOPROXY)
+	err := os.Unsetenv(GOPROXY)
 	if err != nil {
 		return "", err
 	}
@@ -370,7 +345,7 @@ func (pwd *PackageWithDeps) setTransitiveDependencies(targetRepo string, graphDe
 				}
 				if dep == nil {
 					// Dependency is missing in the local cache. Need to download it...
-					dep, err = downloadAndCreateDependency(pwd.cachePath, name, module[1], transitiveDependency, downloadedFromArtifactory, auth)
+					dep, err = downloadAndCreateDependency(pwd.cachePath, name, module[1], transitiveDependency, targetRepo, downloadedFromArtifactory, auth)
 					logError(err)
 					if err != nil {
 						continue

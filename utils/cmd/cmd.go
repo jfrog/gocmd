@@ -14,8 +14,6 @@ import (
 	"path/filepath"
 )
 
-const GOPROXY = "GOPROXY"
-
 var protocolRegExp *gofrogcmd.CmdOutputPattern
 var unrecognizedImportRegExp *gofrogcmd.CmdOutputPattern
 var notFoundRegExp *gofrogcmd.CmdOutputPattern

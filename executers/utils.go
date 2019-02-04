@@ -1,7 +1,6 @@
 package executers
 
 import (
-	"errors"
 	"fmt"
 	"github.com/jfrog/gocmd/utils/cache"
 	"github.com/jfrog/gocmd/utils/cmd"
@@ -17,7 +16,19 @@ import (
 	"strings"
 )
 
-func execute(targetRepo string, failOnError bool, dependenciesInterface GoPackage, cache *cache.DependenciesCache, dependenciesToPublish map[string]bool, serviceManager *artifactory.ArtifactoryServicesManager) error {
+const GOPROXY = "GOPROXY"
+
+// Resolve artifacts from VCS and publish the missing artifacts to Artifactory
+func collectDependenciesAndPublish(targetRepo string, failOnError bool, dependenciesInterface GoPackage, serviceManager *artifactory.ArtifactoryServicesManager) error {
+	rootProjectDir, err := cmd.GetProjectRoot()
+	if err != nil {
+		return err
+	}
+	cache := cache.DependenciesCache{}
+	dependenciesToPublish, err := collectProjectDependencies(targetRepo, rootProjectDir, &cache, serviceManager.GetConfig().GetArtDetails())
+	if err != nil || len(dependenciesToPublish) == 0 {
+		return err
+	}
 	cachePath, packageDependencies, err := getDependencies(dependenciesToPublish)
 	if err != nil {
 		if failOnError {
@@ -25,14 +36,11 @@ func execute(targetRepo string, failOnError bool, dependenciesInterface GoPackag
 		}
 		log.Error("Received an error retrieving project dependencies:", err)
 	}
-	err = populateAndPublish(targetRepo, cachePath, dependenciesInterface, packageDependencies, cache, serviceManager)
+	err = populateAndPublish(targetRepo, cachePath, dependenciesInterface, packageDependencies, &cache, serviceManager)
 	if err != nil {
-		if failOnError {
-			return err
-		}
-		log.Error("Received an error populating and publishing the dependencies:", err)
+		return err
 	}
-	logFinishedMsg(cache)
+	logFinishedMsg(&cache)
 	return nil
 }
 
@@ -42,37 +50,7 @@ func populateAndPublish(targetRepo, cachePath string, dependenciesInterface GoPa
 		dependenciesInterface = dependenciesInterface.New(cachePath, dep)
 		err := dependenciesInterface.PopulateModAndPublish(targetRepo, cache, serviceManager)
 		if err != nil {
-			// If using recursive tidy - the error always nil. If we got here, means that this error happened when not using the recursive tidy flag.
-			return err
-		}
-	}
-	return nil
-}
-
-// Execute Go with GoProxy and if fails, fallback.
-func ExecuteGo(goArg string, noRegistry bool, serviceManager *artifactory.ArtifactoryServicesManager) error {
-	if !noRegistry {
-		artDetails := serviceManager.GetConfig().GetArtDetails()
-		executor := GetCompatibleExecutor()
-		if executor == nil {
-			return errorutils.CheckError(errors.New("No executors were registered."))
-		}
-		err := executor.SetGoProxyEnvVar(artDetails)
-		if err != nil {
-			return err
-		}
-	}
-
-	err := cmd.RunGo(goArg)
-
-	if err != nil {
-		if dependencyNotFoundInArtifactory(err, noRegistry) {
-			log.Info("Received", err.Error(), "from proxy. Trying to download dependencies from VCS...")
-			err = unsetGoProxyAndExecute()
-			if err != nil {
-				return err
-			}
-		} else {
+			// If using recursive publish - the error always nil. If we got here, means that this error happened when not using recursive publish.
 			return err
 		}
 	}
@@ -92,21 +70,7 @@ func dependencyNotFoundInArtifactory(err error, noRegistry bool) bool {
 	return false
 }
 
-func unsetGoProxyAndExecute() error {
-	err := os.Unsetenv(cmd.GOPROXY)
-	if err != nil {
-		return err
-	}
-
-	executor := GetCompatibleExecutor()
-	if executor != nil {
-		return executor.execute()
-	}
-
-	return errorutils.CheckError(errors.New("No executors were registered."))
-}
-
-func setGoProxyEnvVar(repoName string, details auth.ArtifactoryDetails) error {
+func setGoProxyWithApi(repoName string, details auth.ArtifactoryDetails) error {
 	rtUrl, err := url.Parse(details.GetUrl())
 	if err != nil {
 		return errorutils.CheckError(err)
@@ -117,7 +81,7 @@ func setGoProxyEnvVar(repoName string, details auth.ArtifactoryDetails) error {
 		rtUrl.User = url.UserPassword(username, password)
 	}
 	rtUrl.Path += "api/go/" + repoName
-	err = os.Setenv(cmd.GOPROXY, rtUrl.String())
+	err = os.Setenv(GOPROXY, rtUrl.String())
 	return errorutils.CheckError(err)
 }
 

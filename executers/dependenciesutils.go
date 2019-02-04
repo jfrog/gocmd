@@ -29,7 +29,7 @@ const (
 
 // Collects the dependencies of the project
 func collectProjectDependencies(targetRepo, rootProjectDir string, cache *cache.DependenciesCache, auth auth.ArtifactoryDetails) (map[string]bool, error) {
-	dependenciesMap, err := getDependenciesGraphWithFallback(auth)
+	dependenciesMap, err := getDependenciesGraphWithFallback(targetRepo, auth)
 	if err != nil {
 		return nil, err
 	}
@@ -70,11 +70,11 @@ func downloadDependencies(targetRepo string, cache *cache.DependenciesCache, dep
 
 		if resp.StatusCode == 200 {
 			cacheDependenciesMap[getDependencyName(nameAndVersion[0])+":"+nameAndVersion[1]] = true
-			err = downloadDependency(true, module, auth)
+			err = downloadDependency(true, module, targetRepo, auth)
 			dependenciesMap[module] = true
 		} else if resp.StatusCode == 404 {
 			cacheDependenciesMap[getDependencyName(nameAndVersion[0])+":"+nameAndVersion[1]] = false
-			err = downloadDependency(false, module, nil)
+			err = downloadDependency(false, module, targetRepo, nil)
 			dependenciesMap[module] = false
 		}
 
@@ -129,21 +129,14 @@ func replaceExclamationMarkWithUpperCase(moduleName string) string {
 }
 
 // Runs the go mod download command. Should set first the environment variable of GoProxy
-func downloadDependency(downloadFromArtifactory bool, fullDependencyName string, auth auth.ArtifactoryDetails) error {
+func downloadDependency(downloadFromArtifactory bool, fullDependencyName, targetRepo string, auth auth.ArtifactoryDetails) error {
 	var err error
 	if downloadFromArtifactory {
 		log.Debug("Downloading dependency from Artifactory:", fullDependencyName)
-		executor := GetCompatibleExecutor()
-		if executor == nil {
-			return errorutils.CheckError(errors.New("No executors were registered."))
-		}
-		err := executor.SetGoProxyEnvVar(auth)
-		if err != nil {
-			return err
-		}
+		err = setGoProxyWithApi(targetRepo, auth)
 	} else {
 		log.Debug("Downloading dependency from VCS:", fullDependencyName)
-		err = os.Unsetenv(cmd.GOPROXY)
+		err = os.Unsetenv(GOPROXY)
 	}
 	if errorutils.CheckError(err) != nil {
 		return err
@@ -184,9 +177,9 @@ func downloadModFileFromArtifactoryToLocalCache(cachePath, targetRepo, name, ver
 	return ""
 }
 
-func downloadAndCreateDependency(cachePath, name, version, fullDependencyName string, downloadedFromArtifactory bool, auth auth.ArtifactoryDetails) (*Package, error) {
+func downloadAndCreateDependency(cachePath, name, version, fullDependencyName, targetRepo string, downloadedFromArtifactory bool, auth auth.ArtifactoryDetails) (*Package, error) {
 	// Dependency is missing within the cache. Need to download it...
-	err := downloadDependency(downloadedFromArtifactory, fullDependencyName, auth)
+	err := downloadDependency(downloadedFromArtifactory, fullDependencyName, targetRepo, auth)
 	if err != nil {
 		return nil, err
 	}
@@ -368,13 +361,13 @@ func getReplaceDependencies() ([]string, error) {
 }
 
 // Runs go mod graph command with fallback.
-func getDependenciesGraphWithFallback(auth auth.ArtifactoryDetails) (map[string]bool, error) {
+func getDependenciesGraphWithFallback(targetRepo string, auth auth.ArtifactoryDetails) (map[string]bool, error) {
 	dependenciesMap := map[string]bool{}
 	modulesWithErrors := map[string]previousTries{}
 	usedProxy := true
 	for true {
 		// Configuring each run to use Artifactory/VCS
-		err := setOrUnsetGoProxy(usedProxy, auth)
+		err := setOrUnsetGoProxy(usedProxy, targetRepo, auth)
 		if err != nil {
 			return nil, err
 		}
@@ -397,21 +390,13 @@ func getDependenciesGraphWithFallback(auth auth.ArtifactoryDetails) (map[string]
 	return dependenciesMap, nil
 }
 
-func setOrUnsetGoProxy(usedProxy bool, auth auth.ArtifactoryDetails) error {
+func setOrUnsetGoProxy(usedProxy bool, targetRepo string, auth auth.ArtifactoryDetails) error {
 	if !usedProxy {
 		log.Debug("Trying download the dependencies from Artifactory...")
-		executor := GetCompatibleExecutor()
-		if executor == nil {
-			return errorutils.CheckError(errors.New("No executors were registered."))
-		}
-		err := executor.SetGoProxyEnvVar(auth)
-		if err != nil {
-			return err
-		}
-		return nil
+		return setGoProxyWithApi(targetRepo, auth)
 	} else {
 		log.Debug("Trying download the dependencies from the VCS...")
-		return errorutils.CheckError(os.Unsetenv(cmd.GOPROXY))
+		return errorutils.CheckError(os.Unsetenv(GOPROXY))
 	}
 }
 

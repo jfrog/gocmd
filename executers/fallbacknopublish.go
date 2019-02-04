@@ -11,30 +11,37 @@ import (
 	"os"
 )
 
-func Execute(goArg, url string) error {
-	register(&resolverExecuter{goArg: goArg})
+// Run Go with fallback to VCS without publish
+func RunGoWithFallback(goArg string, url string) error {
 	serviceManager, err := createGoCentralServiceManager(url)
 	if err != nil {
 		return err
 	}
-	return ExecuteGo(goArg, false, serviceManager)
+
+	artDetails := serviceManager.GetConfig().GetArtDetails()
+	err = setGoProxyWithoutApi(artDetails)
+	if err != nil {
+		return err
+	}
+	err = cmd.RunGo(goArg)
+
+	if err != nil {
+		log.Info("Received", err.Error(), "from proxy. Trying to download dependencies from VCS...")
+		err := os.Unsetenv(GOPROXY)
+		if err != nil {
+			return err
+		}
+		return cmd.RunGo(goArg)
+	}
+	return nil
 }
 
-type resolverExecuter struct {
-	goArg string
-}
-
-// Run Go without GOPROXY
-func (re *resolverExecuter) execute() error {
-	return cmd.RunGo(re.goArg)
-}
-
-func (re *resolverExecuter) SetGoProxyEnvVar(details auth.ArtifactoryDetails) error {
+func setGoProxyWithoutApi(details auth.ArtifactoryDetails) error {
 	rtUrl, err := url.Parse(details.GetUrl())
 	if err != nil {
 		return errorutils.CheckError(err)
 	}
-	err = os.Setenv(cmd.GOPROXY, rtUrl.String())
+	err = os.Setenv(GOPROXY, rtUrl.String())
 	return errorutils.CheckError(err)
 }
 
