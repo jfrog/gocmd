@@ -12,7 +12,7 @@ import (
 )
 
 // Run Go with fallback to VCS without publish
-func RunWithFallback(goArg string, url string) error {
+func RunWithFallback(goArg []string, url string) error {
 	serviceManager, err := createGoCentralServiceManager(url)
 	if err != nil {
 		return err
