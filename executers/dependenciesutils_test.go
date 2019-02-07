@@ -1,4 +1,4 @@
-package dependencies
+package executers
 
 import (
 	"fmt"
@@ -115,7 +115,7 @@ func TestGetModPath(t *testing.T) {
 		modContent: []byte(modContent),
 		zipPath:    filepath.Join(cachePath, "v1.2.3.zip"),
 	}
-	pwd := PackageWithDeps{Dependency:&dep}
+	pwd := PackageWithDeps{Dependency: &dep}
 	tempDir, err := createDependencyInTemp(dep.GetZipPath())
 	if err != nil {
 		t.Error(err)

@@ -27,7 +27,7 @@ func prepareCmdOutputPattern() error {
 	if notFoundRegExp == nil || unrecognizedImportRegExp == nil || unknownRevisionRegExp == nil {
 		if notFoundRegExp == nil {
 			log.Debug("Initializing not found regexp")
-			notFoundRegExp, err = initRegExp(`[^go:]([^\/\r\n]+\/[^\r\n\s:]*).*(404 Not Found)`, Error)
+			notFoundRegExp, err = initRegExp(`^go: ([^\/\r\n]+\/[^\r\n\s:]*).*(404( Not Found)?[\s]?)$`, Error)
 			if err != nil {
 				return err
 			}
@@ -75,7 +75,7 @@ func MaskCredentials(pattern *gofrogio.CmdOutputPattern) (string, error) {
 
 func Error(pattern *gofrogio.CmdOutputPattern) (string, error) {
 	fmt.Fprintf(os.Stderr, pattern.Line)
-	if len(pattern.MatchedResults) == 3 {
+	if len(pattern.MatchedResults) >= 3 {
 		return "", errors.New(pattern.MatchedResults[2] + ":" + strings.TrimSpace(pattern.MatchedResults[1]))
 	}
 	return "", errors.New(fmt.Sprintf("Regex found the following values: %s", pattern.MatchedResults))
@@ -90,7 +90,7 @@ func GetRegExp(regex string) (*regexp.Regexp, error) {
 	return regExp, nil
 }
 
-func GetSumContentAndRemove(rootProjectDir string) (sumFileContent []byte, sumFileStat os.FileInfo, err error){
+func GetSumContentAndRemove(rootProjectDir string) (sumFileContent []byte, sumFileStat os.FileInfo, err error) {
 	sumFileExists, err := fileutils.IsFileExists(filepath.Join(rootProjectDir, "go.sum"), false)
 	if err != nil {
 		return
@@ -143,20 +143,3 @@ func outputToMap(output string) map[string]bool {
 	}
 	return mapOfDeps
 }
-
-func signModFile(modEditMessage string) error {
-	rootDir, err := GetProjectRoot()
-	if err != nil {
-		return err
-	}
-	modFilePath := filepath.Join(rootDir, "go.mod")
-	stat, err := os.Stat(modFilePath)
-	if err != nil {
-		return errorutils.CheckError(err)
-	}
-	modFileContent, err := ioutil.ReadFile(modFilePath)
-	newContent := append([]byte(modEditMessage+"\n\n"), modFileContent...)
-	err = ioutil.WriteFile(modFilePath, newContent, stat.Mode())
-	return errorutils.CheckError(err)
-}
-

@@ -1,22 +1,19 @@
-package dependencies
+package executers
 
 import (
 	"fmt"
-	"github.com/jfrog/gocmd/utils/cache"
+	"github.com/jfrog/gocmd/cache"
 	"github.com/jfrog/jfrog-client-go/artifactory"
 	"github.com/jfrog/jfrog-client-go/artifactory/buildinfo"
 	"github.com/jfrog/jfrog-client-go/artifactory/services/go"
-	"github.com/jfrog/jfrog-client-go/utils/errorutils"
 	"github.com/jfrog/jfrog-client-go/utils/log"
-	"path/filepath"
 )
 
-func GetCachePath() (string, error) {
-	goPath, err := getGOPATH()
-	if err != nil {
-		return "", errorutils.CheckError(err)
-	}
-	return filepath.Join(goPath, "pkg", "mod", "cache", "download"), nil
+type GoPackage interface {
+	PopulateModAndPublish(targetRepo string, cache *cache.DependenciesCache, serviceManager *artifactory.ArtifactoryServicesManager) error
+	Init() error
+	prepareAndPublish(targetRepo string, cache *cache.DependenciesCache, serviceManager *artifactory.ArtifactoryServicesManager) error
+	New(cachePath string, dependency Package) GoPackage
 }
 
 // Represent go dependency package.
