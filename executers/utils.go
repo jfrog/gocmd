@@ -2,8 +2,8 @@ package executers
 
 import (
 	"fmt"
-	"github.com/jfrog/gocmd/utils/cache"
-	"github.com/jfrog/gocmd/utils/cmd"
+	"github.com/jfrog/gocmd/cache"
+	"github.com/jfrog/gocmd/cmd"
 	gofrogio "github.com/jfrog/gofrog/io"
 	"github.com/jfrog/jfrog-client-go/artifactory"
 	"github.com/jfrog/jfrog-client-go/artifactory/auth"

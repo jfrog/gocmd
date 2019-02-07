@@ -1,7 +1,7 @@
 package executers
 
 import (
-	"github.com/jfrog/gocmd/utils/cmd"
+	"github.com/jfrog/gocmd/cmd"
 	"github.com/jfrog/jfrog-client-go/artifactory"
 	"github.com/jfrog/jfrog-client-go/artifactory/auth"
 	clientutils "github.com/jfrog/jfrog-client-go/utils"
@@ -12,7 +12,7 @@ import (
 )
 
 // Run Go with fallback to VCS without publish
-func RunGoWithFallback(goArg string, url string) error {
+func RunWithFallback(goArg string, url string) error {
 	serviceManager, err := createGoCentralServiceManager(url)
 	if err != nil {
 		return err

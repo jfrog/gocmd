@@ -3,8 +3,8 @@ package executers
 import (
 	"bytes"
 	"fmt"
-	"github.com/jfrog/gocmd/utils/cache"
-	"github.com/jfrog/gocmd/utils/cmd"
+	"github.com/jfrog/gocmd/cache"
+	"github.com/jfrog/gocmd/cmd"
 	"github.com/jfrog/jfrog-client-go/artifactory/auth"
 	"github.com/jfrog/jfrog-client-go/artifactory/buildinfo"
 	"github.com/jfrog/jfrog-client-go/httpclient"
