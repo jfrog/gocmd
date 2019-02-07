@@ -9,10 +9,10 @@ func RecursivePublish(targetRepo, goModEditMessage string, serviceManager *artif
 	return executers.RecursivePublish(targetRepo, goModEditMessage, serviceManager)
 }
 
-func RunWithFallbacksAndPublish(goArg, targetRepo string, noRegistry bool, serviceManager *artifactory.ArtifactoryServicesManager) error {
+func RunWithFallbacksAndPublish(goArg []string, targetRepo string, noRegistry bool, serviceManager *artifactory.ArtifactoryServicesManager) error {
 	return executers.RunWithFallbacksAndPublish(goArg, targetRepo, noRegistry, serviceManager)
 }
 
-func RunWithFallback(goArg string, url string) error {
+func RunWithFallback(goArg []string, url string) error {
 	return executers.RunWithFallback(goArg, url)
 }

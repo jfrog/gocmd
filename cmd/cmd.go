@@ -6,7 +6,6 @@ import (
 	"github.com/jfrog/jfrog-client-go/utils/errorutils"
 	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
 	"github.com/jfrog/jfrog-client-go/utils/log"
-	"github.com/mattn/go-shellwords"
 	"io"
 	"io/ioutil"
 	"os"
@@ -65,17 +64,12 @@ func GetGoVersion() (string, error) {
 	return output, errorutils.CheckError(err)
 }
 
-func RunGo(goArg string) error {
+func RunGo(goArg []string) error {
 	goCmd, err := NewCmd()
 	if err != nil {
 		return err
 	}
-
-	goCmd.Command, err = shellwords.Parse(goArg)
-	if err != nil {
-		return errorutils.CheckError(err)
-	}
-
+	goCmd.Command = goArg
 	err = prepareCmdOutputPattern()
 	if err != nil {
 		return err
