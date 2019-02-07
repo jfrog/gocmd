@@ -1,4 +1,4 @@
-package executers
+package utils
 
 import (
 	"errors"
@@ -24,7 +24,7 @@ func TestDependencyNotFoundInArtifactory(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			actual := dependencyNotFoundInArtifactory(test.err, test.noRegistry)
+			actual := DependencyNotFoundInArtifactory(test.err, test.noRegistry)
 			if test.expected != actual {
 				t.Errorf("Test name: %s: Expected: %v, Got: %v", test.name, test.expected, actual)
 			}

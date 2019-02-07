@@ -27,7 +27,7 @@ func TestRemoveCredentialsFromURL(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			test.regex.MatchedResults = test.regex.RegExp.FindStringSubmatch(test.regex.Line)
-			if test.matched && len(test.regex.MatchedResults) >= 3 {
+			if test.matched && len(test.regex.MatchedResults) > 3 {
 				t.Error(fmt.Sprintf("Expected to find 3 results, however, found %d.", len(test.regex.MatchedResults)))
 			}
 			if test.matched && test.regex.MatchedResults[0] == "" {
