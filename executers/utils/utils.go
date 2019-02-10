@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 )
 
@@ -88,7 +89,7 @@ func GetRegex() (regExp *RegExp, err error) {
 
 func LogError(err error) {
 	if err != nil {
-		log.Error("Received an error:", err)
+		log.Error(err)
 	}
 }
 
@@ -117,4 +118,13 @@ func (reg *RegExp) GetNotEmptyModRegex() *regexp.Regexp {
 
 func (reg *RegExp) GetIndirectRegex() *regexp.Regexp {
 	return reg.indirectRegex
+}
+
+func parseGoPath(goPath string) string {
+	if runtime.GOOS == "windows" {
+		goPathSlice := strings.Split(goPath, ";")
+		return goPathSlice[0]
+	}
+	goPathSlice := strings.Split(goPath, ":")
+	return goPathSlice[0]
 }
