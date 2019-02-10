@@ -1,4 +1,4 @@
-package GoCmd
+package gocmd
 
 import (
 	"github.com/jfrog/gocmd/executers"
