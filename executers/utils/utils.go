@@ -6,6 +6,7 @@ import (
 	"github.com/jfrog/gocmd/cmd"
 	gofrogio "github.com/jfrog/gofrog/io"
 	"github.com/jfrog/jfrog-client-go/artifactory/auth"
+	"github.com/jfrog/jfrog-client-go/utils"
 	"github.com/jfrog/jfrog-client-go/utils/errorutils"
 	"github.com/jfrog/jfrog-client-go/utils/log"
 	"net/url"
@@ -18,11 +19,9 @@ import (
 
 const GOPROXY = "GOPROXY"
 
-
-
 // Returns true if a dependency was not found Artifactory.
 func DependencyNotFoundInArtifactory(err error, noRegistry bool) bool {
-	regExp, errRegex := cmd.GetRegExp(`^404( Not Found)?(\s)?:`)
+	regExp, errRegex := utils.GetRegExp(`^404( Not Found)?(\s)?:`)
 	if errRegex != nil {
 		LogError(errRegex)
 		return false
@@ -70,12 +69,12 @@ func getGOPATH() (string, error) {
 }
 
 func GetRegex() (regExp *RegExp, err error) {
-	emptyRegex, err := cmd.GetRegExp(`^\s*require (?:[\(\w\.@:%_\+-.~#?&]?.+)`)
+	emptyRegex, err := utils.GetRegExp(`^\s*require (?:[\(\w\.@:%_\+-.~#?&]?.+)`)
 	if err != nil {
 		return
 	}
 
-	indirectRegex, err := cmd.GetRegExp(`(// indirect)$`)
+	indirectRegex, err := utils.GetRegExp(`(// indirect)$`)
 	if err != nil {
 		return
 	}

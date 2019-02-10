@@ -10,6 +10,7 @@ import (
 	"github.com/jfrog/jfrog-client-go/artifactory/auth"
 	"github.com/jfrog/jfrog-client-go/artifactory/buildinfo"
 	"github.com/jfrog/jfrog-client-go/httpclient"
+	clientutils "github.com/jfrog/jfrog-client-go/utils"
 	"github.com/jfrog/jfrog-client-go/utils/errorutils"
 	multifilereader "github.com/jfrog/jfrog-client-go/utils/io"
 	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
@@ -384,7 +385,7 @@ func mergeReplaceDependenciesWithGraphDependencies(replaceDeps []string, graphDe
 }
 
 func getReplaceDependencies() ([]string, error) {
-	replaceRegExp, err := cmd.GetRegExp(`\s*replace (?:[\(\w\.@:%_\+-.~#?&]?.+)`)
+	replaceRegExp, err := clientutils.GetRegExp(`\s*replace (?:[\(\w\.@:%_\+-.~#?&]?.+)`)
 	if err != nil {
 		return nil, err
 	}

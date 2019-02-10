@@ -1,8 +1,8 @@
 module github.com/jfrog/gocmd
 
 require (
-	github.com/jfrog/gofrog v1.0.3
-	github.com/jfrog/jfrog-client-go v0.3.0
+	github.com/jfrog/gofrog v1.0.4
+	github.com/jfrog/jfrog-client-go v0.3.1
 	github.com/mattn/go-shellwords v1.0.3
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/common v0.0.0-20190107103113-2998b132700a // indirect
@@ -10,4 +10,4 @@ require (
 	golang.org/x/lint v0.0.0-20181217174547-8f45f776aaf1 // indirect
 )
 
-replace github.com/jfrog/jfrog-client-go => github.com/jfrog/jfrog-client-go dev
+replace github.com/jfrog/jfrog-client-go => github.com/jfrog/jfrog-client-go v0.3.1
