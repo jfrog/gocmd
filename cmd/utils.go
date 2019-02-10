@@ -4,13 +4,13 @@ import (
 	"errors"
 	"fmt"
 	gofrogio "github.com/jfrog/gofrog/io"
+	"github.com/jfrog/jfrog-client-go/utils"
 	"github.com/jfrog/jfrog-client-go/utils/errorutils"
 	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
 	"github.com/jfrog/jfrog-client-go/utils/log"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 )
 
@@ -19,7 +19,7 @@ func prepareCmdOutputPattern() error {
 	var err error
 	if protocolRegExp == nil {
 		log.Debug("Initializing protocol regexp")
-		protocolRegExp, err = initRegExp(`((http|https):\/\/\w.*?:\w.*?@)`, MaskCredentials)
+		protocolRegExp, err = initRegExp(utils.CredentialsInUrlRegexp, MaskCredentials)
 		if err != nil {
 			return err
 		}
@@ -53,7 +53,7 @@ func prepareCmdOutputPattern() error {
 }
 
 func initRegExp(regex string, execFunc func(pattern *gofrogio.CmdOutputPattern) (string, error)) (*gofrogio.CmdOutputPattern, error) {
-	regExp, err := GetRegExp(regex)
+	regExp, err := utils.GetRegExp(regex)
 	if err != nil {
 		return &gofrogio.CmdOutputPattern{}, err
 	}
@@ -66,11 +66,9 @@ func initRegExp(regex string, execFunc func(pattern *gofrogio.CmdOutputPattern) 
 	return outputPattern, nil
 }
 
-// Mask the credentials information from the line. The credentials are build as user:password
-// For example: http://user:password@127.0.0.1:8081/artifactory/path/to/repo
+// Mask the credentials information from the line.
 func MaskCredentials(pattern *gofrogio.CmdOutputPattern) (string, error) {
-	splittedResult := strings.Split(pattern.MatchedResults[0], "//")
-	return strings.Replace(pattern.Line, pattern.MatchedResults[0], splittedResult[0]+"//***.***@", 1), nil
+	return utils.MaskCredentials(pattern.Line, pattern.MatchedResults[0]), nil
 }
 
 func Error(pattern *gofrogio.CmdOutputPattern) (string, error) {
@@ -79,15 +77,6 @@ func Error(pattern *gofrogio.CmdOutputPattern) (string, error) {
 		return "", errors.New(pattern.MatchedResults[2] + ":" + strings.TrimSpace(pattern.MatchedResults[1]))
 	}
 	return "", errors.New(fmt.Sprintf("Regex found the following values: %s", pattern.MatchedResults))
-}
-
-func GetRegExp(regex string) (*regexp.Regexp, error) {
-	regExp, err := regexp.Compile(regex)
-	if err != nil {
-		return nil, err
-	}
-
-	return regExp, nil
 }
 
 func GetSumContentAndRemove(rootProjectDir string) (sumFileContent []byte, sumFileStat os.FileInfo, err error) {
