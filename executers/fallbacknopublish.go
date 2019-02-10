@@ -2,6 +2,7 @@ package executers
 
 import (
 	"github.com/jfrog/gocmd/cmd"
+	"github.com/jfrog/gocmd/executers/utils"
 	"github.com/jfrog/jfrog-client-go/artifactory"
 	"github.com/jfrog/jfrog-client-go/artifactory/auth"
 	clientutils "github.com/jfrog/jfrog-client-go/utils"
@@ -27,7 +28,7 @@ func RunWithFallback(goArg []string, url string) error {
 
 	if err != nil {
 		log.Info("Received", err.Error(), "from proxy. Trying to download dependencies from VCS...")
-		err := os.Unsetenv(GOPROXY)
+		err := os.Unsetenv(utils.GOPROXY)
 		if err != nil {
 			return err
 		}
@@ -41,7 +42,7 @@ func setGoProxyWithoutApi(details auth.ArtifactoryDetails) error {
 	if err != nil {
 		return errorutils.CheckError(err)
 	}
-	err = os.Setenv(GOPROXY, rtUrl.String())
+	err = os.Setenv(utils.GOPROXY, rtUrl.String())
 	return errorutils.CheckError(err)
 }
 

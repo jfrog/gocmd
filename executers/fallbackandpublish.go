@@ -2,6 +2,7 @@ package executers
 
 import (
 	"github.com/jfrog/gocmd/cmd"
+	"github.com/jfrog/gocmd/executers/utils"
 	"github.com/jfrog/jfrog-client-go/artifactory"
 	"github.com/jfrog/jfrog-client-go/utils/log"
 	"os"
@@ -11,7 +12,7 @@ import (
 func RunWithFallbacksAndPublish(goArg []string, targetRepo string, noRegistry bool, serviceManager *artifactory.ArtifactoryServicesManager) error {
 	if !noRegistry {
 		artDetails := serviceManager.GetConfig().GetArtDetails()
-		err := setGoProxyWithApi(targetRepo, artDetails)
+		err := utils.SetGoProxyWithApi(targetRepo, artDetails)
 		if err != nil {
 			return err
 		}
@@ -20,9 +21,9 @@ func RunWithFallbacksAndPublish(goArg []string, targetRepo string, noRegistry bo
 	err := cmd.RunGo(goArg)
 
 	if err != nil {
-		if dependencyNotFoundInArtifactory(err, noRegistry) {
+		if utils.DependencyNotFoundInArtifactory(err, noRegistry) {
 			log.Info("Received", err.Error(), "from Artifactory. Trying to download dependencies from VCS...")
-			err := os.Unsetenv(GOPROXY)
+			err := os.Unsetenv(utils.GOPROXY)
 			if err != nil {
 				return err
 			}

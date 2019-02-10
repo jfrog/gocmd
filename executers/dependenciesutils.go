@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"github.com/jfrog/gocmd/cache"
 	"github.com/jfrog/gocmd/cmd"
+	"github.com/jfrog/gocmd/executers/utils"
+	"github.com/jfrog/jfrog-client-go/artifactory"
 	"github.com/jfrog/jfrog-client-go/artifactory/auth"
 	"github.com/jfrog/jfrog-client-go/artifactory/buildinfo"
 	"github.com/jfrog/jfrog-client-go/httpclient"
@@ -26,6 +28,45 @@ const (
 	FailedToRetrieve          = "Failed to retrieve"
 	FromBothArtifactoryAndVcs = "from both Artifactory and VCS"
 )
+
+// Resolve artifacts from VCS and publish the missing artifacts to Artifactory
+func collectDependenciesAndPublish(targetRepo string, failOnError bool, dependenciesInterface GoPackage, serviceManager *artifactory.ArtifactoryServicesManager) error {
+	rootProjectDir, err := cmd.GetProjectRoot()
+	if err != nil {
+		return err
+	}
+	cache := cache.DependenciesCache{}
+	dependenciesToPublish, err := collectProjectDependencies(targetRepo, rootProjectDir, &cache, serviceManager.GetConfig().GetArtDetails())
+	if err != nil || len(dependenciesToPublish) == 0 {
+		return err
+	}
+	cachePath, packageDependencies, err := getDependencies(dependenciesToPublish)
+	if err != nil {
+		if failOnError {
+			return err
+		}
+		log.Error("Received an error retrieving project dependencies:", err)
+	}
+	err = populateAndPublish(targetRepo, cachePath, dependenciesInterface, packageDependencies, &cache, serviceManager)
+	if err != nil {
+		return err
+	}
+	utils.LogFinishedMsg(&cache)
+	return nil
+}
+
+func populateAndPublish(targetRepo, cachePath string, dependenciesInterface GoPackage, packageDependencies []Package, cache *cache.DependenciesCache, serviceManager *artifactory.ArtifactoryServicesManager) error {
+	cache.IncrementTotal(len(packageDependencies))
+	for _, dep := range packageDependencies {
+		dependenciesInterface = dependenciesInterface.New(cachePath, dep)
+		err := dependenciesInterface.PopulateModAndPublish(targetRepo, cache, serviceManager)
+		if err != nil {
+			// If using recursive publish - the error always nil. If we got here, means that this error happened when not using recursive publish.
+			return err
+		}
+	}
+	return nil
+}
 
 // Collects the dependencies of the project
 func collectProjectDependencies(targetRepo, rootProjectDir string, cache *cache.DependenciesCache, auth auth.ArtifactoryDetails) (map[string]bool, error) {
@@ -133,10 +174,10 @@ func downloadDependency(downloadFromArtifactory bool, fullDependencyName, target
 	var err error
 	if downloadFromArtifactory {
 		log.Debug("Downloading dependency from Artifactory:", fullDependencyName)
-		err = setGoProxyWithApi(targetRepo, auth)
+		err = utils.SetGoProxyWithApi(targetRepo, auth)
 	} else {
 		log.Debug("Downloading dependency from VCS:", fullDependencyName)
-		err = os.Unsetenv(GOPROXY)
+		err = os.Unsetenv(utils.GOPROXY)
 	}
 	if errorutils.CheckError(err) != nil {
 		return err
@@ -393,16 +434,16 @@ func getDependenciesGraphWithFallback(targetRepo string, auth auth.ArtifactoryDe
 func setOrUnsetGoProxy(usedProxy bool, targetRepo string, auth auth.ArtifactoryDetails) error {
 	if !usedProxy {
 		log.Debug("Trying download the dependencies from Artifactory...")
-		return setGoProxyWithApi(targetRepo, auth)
+		return utils.SetGoProxyWithApi(targetRepo, auth)
 	} else {
 		log.Debug("Trying download the dependencies from the VCS...")
-		return errorutils.CheckError(os.Unsetenv(GOPROXY))
+		return errorutils.CheckError(os.Unsetenv(utils.GOPROXY))
 	}
 }
 
 func getModuleAndVersion(usedProxy bool, err error) (string, error) {
 	splittedLine := strings.Split(err.Error(), ":")
-	logDebug(err, usedProxy)
+	utils.LogDebug(err, usedProxy)
 	if len(splittedLine) < 2 {
 		return "", errorutils.CheckError(errors.New("Missing module name and version in the error message " + err.Error()))
 	}
@@ -416,7 +457,7 @@ func populateModWithTidy(path string) error {
 	}
 	log.Debug("Preparing to populate mod", filepath.Dir(path))
 	err = removeGoSum(path)
-	logError(err)
+	utils.LogError(err)
 	// Running go mod tidy command
 	err = cmd.RunGoModTidy()
 	if err != nil {
@@ -462,7 +503,7 @@ func (pt *previousTries) setTriedFrom(usedProxy bool) {
 
 // Download the dependencies from VCS and publish them to Artifactory.
 func getDependencies(dependenciesToPublish map[string]bool) (cachePath string, packageDependencies []Package, err error) {
-	cachePath, err = GetCachePath()
+	cachePath, err = utils.GetCachePath()
 	if err != nil {
 		return
 	}
