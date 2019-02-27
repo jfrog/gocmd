@@ -3,15 +3,16 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"strings"
+
 	gofrogio "github.com/jfrog/gofrog/io"
 	"github.com/jfrog/jfrog-client-go/utils"
 	"github.com/jfrog/jfrog-client-go/utils/errorutils"
 	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
 	"github.com/jfrog/jfrog-client-go/utils/log"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"strings"
 )
 
 func prepareRegExp() error {
@@ -42,8 +43,8 @@ func prepareGlobalRegExp() error {
 	}
 
 	if unrecognizedImportRegExp == nil {
-		log.Debug("Initializing unrecognized import path regexp")
-		unrecognizedImportRegExp, err = initRegExp(`[^go:]([^\/\r\n]+\/[^\r\n\s:]*).*(unrecognized import path)`, Error)
+		log.Debug("Initializing unknown import path regexp")
+		unrecognizedImportRegExp, err = initRegExp(`[^go:]([^\/\r\n]+\/[^\r\n\s:]*).*(unknown import path)`, Error)
 		if err != nil {
 			return err
 		}
@@ -91,7 +92,7 @@ func Error(pattern *gofrogio.CmdOutputPattern) (string, error) {
 		return "", errorutils.CheckError(err)
 	}
 	if len(pattern.MatchedResults) >= 3 {
-		return "", errors.New(pattern.MatchedResults[2] + ":" + strings.TrimSpace(pattern.MatchedResults[1]))
+		return "", errors.New(pattern.MatchedResults[2] + ": " + strings.TrimSpace(pattern.MatchedResults[0]))
 	}
 	return "", errors.New(fmt.Sprintf("Regex found the following values: %s", pattern.MatchedResults))
 }
