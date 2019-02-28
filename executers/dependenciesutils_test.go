@@ -39,7 +39,7 @@ func TestGetPackageZipLocation(t *testing.T) {
 	}
 }
 
-func TestGetDependencyName(t *testing.T) {
+func TestGetDependencyToLowerCase(t *testing.T) {
 	tests := []struct {
 		dependencyName string
 		expectedPath   string
@@ -53,7 +53,7 @@ func TestGetDependencyName(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.dependencyName, func(t *testing.T) {
-			actual := getDependencyName(test.dependencyName)
+			actual := getDependencyToLowerCase(test.dependencyName)
 			if test.expectedPath != actual {
 				t.Errorf("Test name: %s: Expected: %s, Got: %s", test.dependencyName, test.expectedPath, actual)
 			}
@@ -145,6 +145,8 @@ func TestMergeReplaceDependenciesWithGraphDependencies(t *testing.T) {
 			map[string]bool{"github.com/jfrog/jfrog-client-go@v0.1.0": true}},
 		{"addToGraphMap", []string{"replace github.com/jfrog/jfrog-client-go => github.com/jfrog/jfrog-client-go v0.1.0", "replace github.com/jfrog/jfrog-client-go => github.com/jfrog/jfrog-cli-go", "replace github.com/jfrog/jfrog-client-go => /path/to/mod/file"}, map[string]bool{"github.com/jfrog/jfrog-cli-go@v1.21.0": true},
 			map[string]bool{"github.com/jfrog/jfrog-cli-go@v1.21.0": true, "github.com/jfrog/jfrog-client-go@v0.1.0": true}},
+		{"addToGraphMapFromReplaceBlock", []string{"replace github.com/jfrog/jfrog-client-go => github.com/jfrog/jfrog-client-go v0.1.0", "replace github.com/jfrog/jfrog-client-go => github.com/jfrog/jfrog-cli-go", "replace github.com/jfrog/jfrog-client-go => /path/to/mod/file", "github.com/jfrog/jfrog-client-go => github.com/jfrog/jfrog-client-go v2.1.2"}, map[string]bool{"github.com/jfrog/jfrog-cli-go@v1.21.0": true},
+			map[string]bool{"github.com/jfrog/jfrog-cli-go@v1.21.0": true, "github.com/jfrog/jfrog-client-go@v0.1.0": true, "github.com/jfrog/jfrog-client-go@v2.1.2": true}},
 	}
 
 	for _, test := range tests {
@@ -152,6 +154,112 @@ func TestMergeReplaceDependenciesWithGraphDependencies(t *testing.T) {
 			mergeReplaceDependenciesWithGraphDependencies(test.replaceDeps, test.graphDependencies)
 			if !reflect.DeepEqual(test.expectedMap, test.graphDependencies) {
 				t.Errorf("Test name: %s: Expected: %v, Got: %v", test.name, test.expectedMap, test.graphDependencies)
+			}
+		})
+	}
+}
+
+func TestParseModForReplaceDependencies(t *testing.T) {
+	tests := []struct {
+		name                        string
+		modContent                  string
+		expectedReplaceDependencies []string
+	}{
+		{"replaceBlockFirst", `module jfrog.com/jfrog-router
+
+replace (
+        github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible
+        github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1
+)
+
+require (
+        code.cloudfoundry.org/clock v0.0.0-20180518195852-02e53af36e6c // indirect
+        contrib.go.opencensus.io/exporter/ocagent v0.4.6 // indirect
+)
+`, []string{"        github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible", "        github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1"}},
+		{
+			"replaceBlockLast", `module jfrog.com/jfrog-router
+
+require (
+        code.cloudfoundry.org/clock v0.0.0-20180518195852-02e53af36e6c // indirect
+        contrib.go.opencensus.io/exporter/ocagent v0.4.6 // indirect
+)
+
+replace (
+        github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible
+        github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1
+)
+
+
+`, []string{"        github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible", "        github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1"}},
+		{
+			"replaceLineFirst", `module jfrog.com/jfrog-router
+
+replace github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible
+replace github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1
+
+require (
+        code.cloudfoundry.org/clock v0.0.0-20180518195852-02e53af36e6c // indirect
+        contrib.go.opencensus.io/exporter/ocagent v0.4.6 // indirect
+)
+`, []string{"replace github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible", "replace github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1"}},
+		{
+			"replaceLineLast", `module jfrog.com/jfrog-router
+
+require (
+        code.cloudfoundry.org/clock v0.0.0-20180518195852-02e53af36e6c // indirect
+        contrib.go.opencensus.io/exporter/ocagent v0.4.6 // indirect
+)
+
+replace github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible
+replace github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1
+
+`, []string{"replace github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible", "replace github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1"}},
+		{
+			"replaceBothLineFirst", `module jfrog.com/jfrog-router
+
+require (
+        code.cloudfoundry.org/clock v0.0.0-20180518195852-02e53af36e6c // indirect
+        contrib.go.opencensus.io/exporter/ocagent v0.4.6 // indirect
+)
+
+replace github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible
+replace github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1
+
+replace (
+        github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible
+        github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1
+)
+
+`, []string{"replace github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible", "replace github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1", "        github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible", "        github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1"}},
+		{
+			"replaceBothBlockFirst", `module jfrog.com/jfrog-router
+
+require (
+        code.cloudfoundry.org/clock v0.0.0-20180518195852-02e53af36e6c // indirect
+        contrib.go.opencensus.io/exporter/ocagent v0.4.6 // indirect
+)
+
+replace (
+        github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible
+        github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1
+)
+
+replace github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible
+replace github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1
+
+
+`, []string{"replace github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible", "replace github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1", "        github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible", "        github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1"}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			replaceLinerDependencies, err := parseModForReplaceDependencies(test.modContent)
+			if err != nil {
+				t.Error(err)
+			}
+			if !reflect.DeepEqual(test.expectedReplaceDependencies, replaceLinerDependencies) {
+				t.Errorf("Test name: %s: Expected: %v, Got: %v", test.name, test.expectedReplaceDependencies, replaceLinerDependencies)
 			}
 		})
 	}

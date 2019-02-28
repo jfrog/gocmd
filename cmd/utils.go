@@ -15,7 +15,7 @@ import (
 )
 
 // Compiles all the regex once
-func prepareCmdOutputPattern() error {
+func prepareCmdOutputPattern(shouldInitRegExp bool) error {
 	var err error
 	if protocolRegExp == nil {
 		log.Debug("Initializing protocol regexp")
@@ -49,6 +49,14 @@ func prepareCmdOutputPattern() error {
 			}
 		}
 	}
+
+	if shouldInitRegExp && notFoundZipRegExp == nil {
+		log.Debug("Initializing not found zip file")
+		notFoundZipRegExp, err = initRegExp(`unknown import path ["]([^\/\r\n]+\/[^\r\n\s:]*)["].*(404( Not Found)?[\s]?)$`, Error)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -72,7 +80,10 @@ func MaskCredentials(pattern *gofrogio.CmdOutputPattern) (string, error) {
 }
 
 func Error(pattern *gofrogio.CmdOutputPattern) (string, error) {
-	fmt.Fprintf(os.Stderr, pattern.Line)
+	_, err := fmt.Fprint(os.Stderr, pattern.Line)
+	if err != nil {
+		return "", err
+	}
 	if len(pattern.MatchedResults) >= 3 {
 		return "", errors.New(pattern.MatchedResults[2] + ":" + strings.TrimSpace(pattern.MatchedResults[1]))
 	}
