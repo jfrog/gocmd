@@ -256,7 +256,7 @@ func (pwd *PackageWithDeps) prepareAndRunInit(pathToModFile string) error {
 	// If empty, run go mod init
 	moduleId := pwd.Dependency.GetId()
 	moduleInfo := strings.Split(moduleId, ":")
-	return cmd.RunGoModInit(replaceExclamationMarkWithUpperCase(moduleInfo[0]))
+	return cmd.RunGoModInit(goModDecode(moduleInfo[0]))
 }
 
 func writeModContentToModFile(path string, modContent []byte) error {
@@ -266,7 +266,10 @@ func writeModContentToModFile(path string, modContent []byte) error {
 func (pwd *PackageWithDeps) getModPathInTemp(tempDir string) string {
 	moduleId := pwd.Dependency.GetId()
 	moduleInfo := strings.Split(moduleId, ":")
-	moduleInfo[0] = replaceExclamationMarkWithUpperCase(moduleInfo[0])
+	moduleInfo[0] = goModDecode(moduleInfo[0])
+	if len(moduleInfo) > 1 {
+		moduleInfo[1] = goModDecode(moduleInfo[1])
+	}
 	moduleId = strings.Join(moduleInfo, ":")
 	modulePath := strings.Replace(moduleId, ":", "@", 1)
 	path := filepath.Join(tempDir, modulePath, "go.mod")
@@ -325,11 +328,12 @@ func (pwd *PackageWithDeps) setTransitiveDependencies(targetRepo string, graphDe
 		module := strings.Split(transitiveDependency, "@")
 		if len(module) == 2 {
 			dependenciesMap := cache.GetMap()
-			name := getDependencyName(module[0])
-			_, exists := dependenciesMap[name+":"+module[1]]
+			name := goModEncode(module[0])
+			version := goModEncode(module[1])
+			_, exists := dependenciesMap[name+":"+version]
 			if !exists {
 				// Check if the dependency is in the local cache.
-				dep, err := createDependency(pwd.cachePath, name, module[1])
+				dep, err := createDependency(pwd.cachePath, name, version)
 				utils.LogError(err)
 				if err != nil {
 					continue
@@ -346,7 +350,7 @@ func (pwd *PackageWithDeps) setTransitiveDependencies(targetRepo string, graphDe
 				}
 				if dep == nil {
 					// Dependency is missing in the local cache. Need to download it...
-					dep, err = downloadAndCreateDependency(pwd.cachePath, name, module[1], transitiveDependency, targetRepo, downloadedFromArtifactory, auth)
+					dep, err = downloadAndCreateDependency(pwd.cachePath, name, version, transitiveDependency, targetRepo, downloadedFromArtifactory, auth)
 					utils.LogError(err)
 					if err != nil {
 						continue
@@ -360,7 +364,7 @@ func (pwd *PackageWithDeps) setTransitiveDependencies(targetRepo string, graphDe
 						cachePath:        pwd.cachePath,
 						GoModEditMessage: pwd.GoModEditMessage}
 					dependencies = append(dependencies, *depsWithTrans)
-					dependenciesMap[name+":"+module[1]] = downloadedFromArtifactory
+					dependenciesMap[name+":"+version] = downloadedFromArtifactory
 				}
 			} else {
 				log.Debug("Dependency", transitiveDependency, "has been previously added.")

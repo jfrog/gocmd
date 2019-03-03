@@ -3,6 +3,7 @@ package executers
 import (
 	"fmt"
 	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -39,7 +40,7 @@ func TestGetPackageZipLocation(t *testing.T) {
 	}
 }
 
-func TestGetDependencyName(t *testing.T) {
+func TestEncodeDecodePath(t *testing.T) {
 	tests := []struct {
 		dependencyName string
 		expectedPath   string
@@ -53,9 +54,13 @@ func TestGetDependencyName(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.dependencyName, func(t *testing.T) {
-			actual := getDependencyName(test.dependencyName)
-			if test.expectedPath != actual {
-				t.Errorf("Test name: %s: Expected: %s, Got: %s", test.dependencyName, test.expectedPath, actual)
+			encoded := goModEncode(test.dependencyName)
+			if test.expectedPath != encoded {
+				t.Errorf("Test name: %s: Expected: %s, Got: %s", test.dependencyName, test.expectedPath, encoded)
+			}
+			decoded := goModDecode(test.expectedPath)
+			if test.dependencyName != decoded {
+				t.Errorf("Test name: %s: Expected: %s, Got: %s", test.dependencyName, test.dependencyName, decoded)
 			}
 		})
 	}
@@ -145,6 +150,8 @@ func TestMergeReplaceDependenciesWithGraphDependencies(t *testing.T) {
 			map[string]bool{"github.com/jfrog/jfrog-client-go@v0.1.0": true}},
 		{"addToGraphMap", []string{"replace github.com/jfrog/jfrog-client-go => github.com/jfrog/jfrog-client-go v0.1.0", "replace github.com/jfrog/jfrog-client-go => github.com/jfrog/jfrog-cli-go", "replace github.com/jfrog/jfrog-client-go => /path/to/mod/file"}, map[string]bool{"github.com/jfrog/jfrog-cli-go@v1.21.0": true},
 			map[string]bool{"github.com/jfrog/jfrog-cli-go@v1.21.0": true, "github.com/jfrog/jfrog-client-go@v0.1.0": true}},
+		{"addToGraphMapFromReplaceBlock", []string{"replace github.com/jfrog/jfrog-client-go => github.com/jfrog/jfrog-client-go v0.1.0", "replace github.com/jfrog/jfrog-client-go => github.com/jfrog/jfrog-cli-go", "replace github.com/jfrog/jfrog-client-go => /path/to/mod/file", "github.com/jfrog/jfrog-client-go => github.com/jfrog/jfrog-client-go v2.1.2"}, map[string]bool{"github.com/jfrog/jfrog-cli-go@v1.21.0": true},
+			map[string]bool{"github.com/jfrog/jfrog-cli-go@v1.21.0": true, "github.com/jfrog/jfrog-client-go@v0.1.0": true, "github.com/jfrog/jfrog-client-go@v2.1.2": true}},
 	}
 
 	for _, test := range tests {
@@ -152,6 +159,47 @@ func TestMergeReplaceDependenciesWithGraphDependencies(t *testing.T) {
 			mergeReplaceDependenciesWithGraphDependencies(test.replaceDeps, test.graphDependencies)
 			if !reflect.DeepEqual(test.expectedMap, test.graphDependencies) {
 				t.Errorf("Test name: %s: Expected: %v, Got: %v", test.name, test.expectedMap, test.graphDependencies)
+			}
+		})
+	}
+}
+
+func TestParseModForReplaceDependencies(t *testing.T) {
+	testdata, err := getBaseDir()
+	if err != nil {
+		t.Error(err)
+	}
+
+	modDir := testdata + fileutils.GetFileSeparator() + "mods" + fileutils.GetFileSeparator()
+	tests := []struct {
+		name                        string
+		expectedReplaceDependencies []string
+	}{
+		{"replaceBlockFirst", []string{"        github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible", "        github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1"}},
+		{
+			"replaceBlockLast", []string{"        github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible", "        github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1"}},
+		{
+			"replaceLineFirst", []string{"replace github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible", "replace github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1"}},
+		{
+			"replaceLineLast", []string{"replace github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible", "replace github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1"}},
+		{
+			"replaceBothLineFirst", []string{"replace github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible", "replace github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1", "        github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible", "        github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1"}},
+		{
+			"replaceBothBlockFirst", []string{"replace github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible", "replace github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1", "        github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible", "        github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1"}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			modContent, err := ioutil.ReadFile(modDir + test.name + ".txt")
+			if err != nil {
+				t.Error(err)
+			}
+			replaceLinerDependencies, err := parseModForReplaceDependencies(string(modContent))
+			if err != nil {
+				t.Error(err)
+			}
+			if !reflect.DeepEqual(test.expectedReplaceDependencies, replaceLinerDependencies) {
+				t.Errorf("Test name: %s: Expected: %v, Got: %v", test.name, test.expectedReplaceDependencies, replaceLinerDependencies)
 			}
 		})
 	}

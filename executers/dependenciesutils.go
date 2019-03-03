@@ -111,11 +111,11 @@ func downloadDependencies(targetRepo string, cache *cache.DependenciesCache, dep
 		}
 
 		if resp.StatusCode == 200 {
-			cacheDependenciesMap[getDependencyName(nameAndVersion[0])+":"+nameAndVersion[1]] = true
+			cacheDependenciesMap[goModEncode(nameAndVersion[0])+":"+goModEncode(nameAndVersion[1])] = true
 			err = downloadDependency(true, module, targetRepo, auth)
 			dependenciesMap[module] = true
 		} else if resp.StatusCode == 404 {
-			cacheDependenciesMap[getDependencyName(nameAndVersion[0])+":"+nameAndVersion[1]] = false
+			cacheDependenciesMap[goModEncode(nameAndVersion[0])+":"+goModEncode(nameAndVersion[1])] = false
 			err = downloadDependency(false, module, targetRepo, nil)
 			dependenciesMap[module] = false
 		}
@@ -154,17 +154,35 @@ func createDependencyInTemp(zipPath string) (tempDir string, err error) {
 	return tempDir, nil
 }
 
-func replaceExclamationMarkWithUpperCase(moduleName string) string {
+// Returns the actual path to the dependency.
+// If in the path there are capital letters, the Go convention is to use "!" before the letter.
+// The letter itself in lowercase.
+func goModEncode(name string) string {
+	path := ""
+	for _, letter := range name {
+		if unicode.IsUpper(letter) {
+			path += "!" + strings.ToLower(string(letter))
+		} else {
+			path += string(letter)
+		}
+	}
+	return path
+}
+
+// Returns the path to the dependency decoded form lower case to upper case
+// If in the path there are capital letters, the Go convention is to use "!" before the letter.
+// The letter itself in lowercase. This function will decode back to Upper case
+func goModDecode(name string) string {
 	var str string
-	for i := 0; i < len(moduleName); i++ {
-		if string(moduleName[i]) == "!" {
-			if i < len(moduleName)-1 {
-				r := rune(moduleName[i+1])
+	for i := 0; i < len(name); i++ {
+		if string(name[i]) == "!" {
+			if i < len(name)-1 {
+				r := rune(name[i+1])
 				str += string(unicode.ToUpper(r))
 				i++
 			}
 		} else {
-			str += string(moduleName[i])
+			str += string(name[i])
 		}
 	}
 	return str
@@ -248,8 +266,8 @@ func GetDependencies(cachePath string, moduleSlice map[string]bool) ([]Package, 
 	var deps []Package
 	for module := range moduleSlice {
 		moduleInfo := strings.Split(module, "@")
-		name := getDependencyName(moduleInfo[0])
-		dep, err := createDependency(cachePath, name, moduleInfo[1])
+		name := goModEncode(moduleInfo[0])
+		dep, err := createDependency(cachePath, name, goModEncode(moduleInfo[1]))
 		if err != nil {
 			return nil, err
 		}
@@ -258,21 +276,6 @@ func GetDependencies(cachePath string, moduleSlice map[string]bool) ([]Package, 
 		}
 	}
 	return deps, nil
-}
-
-// Returns the actual path to the dependency.
-// If in the path there are capital letters, the Go convention is to use "!" before the letter.
-// The letter itself in lowercase.
-func getDependencyName(name string) string {
-	path := ""
-	for _, letter := range name {
-		if unicode.IsUpper(letter) {
-			path += "!" + strings.ToLower(string(letter))
-		} else {
-			path += string(letter)
-		}
-	}
-	return path
 }
 
 // Creates a go dependency.
@@ -385,10 +388,6 @@ func mergeReplaceDependenciesWithGraphDependencies(replaceDeps []string, graphDe
 }
 
 func getReplaceDependencies() ([]string, error) {
-	replaceRegExp, err := clientutils.GetRegExp(`\s*replace (?:[\(\w\.@:%_\+-.~#?&]?.+)`)
-	if err != nil {
-		return nil, err
-	}
 	rootDir, err := cmd.GetProjectRoot()
 	if err != nil {
 		return nil, err
@@ -398,8 +397,35 @@ func getReplaceDependencies() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	replaceDependencies := replaceRegExp.FindAllString(string(modFileContent), -1)
-	return replaceDependencies, nil
+	return parseModForReplaceDependencies(string(modFileContent))
+}
+
+func parseModForReplaceDependencies(modFileContent string) ([]string, error) {
+	replaceLinerRegExp, err := clientutils.GetRegExp(`[^\s*]?replace (?:[\(\w\.@:%_\+-.~#?&]?.+)=>(?:[\(\w\.@:%_\+-.~#?&]?.+)`)
+	if err != nil {
+		return nil, err
+	}
+	replaceLinerDependencies := replaceLinerRegExp.FindAllString(modFileContent, -1)
+	replaceRegExp, err := clientutils.GetRegExp(`\s*replace\s*\(`)
+	if err != nil {
+		return replaceLinerDependencies, err
+	}
+	replaceDependencies := replaceRegExp.FindAllString(modFileContent, -1)
+	if len(replaceDependencies) > 0 {
+		log.Debug("Found replace block...")
+		replacePosition := strings.Index(modFileContent, replaceDependencies[0])
+		lines := strings.Split(modFileContent[replacePosition+len(replaceDependencies[0]):], "\n")
+		for _, line := range lines {
+			if line == ")" {
+				break
+			}
+			if line == "" || line == "\n" {
+				continue
+			}
+			replaceLinerDependencies = append(replaceLinerDependencies, line)
+		}
+	}
+	return replaceLinerDependencies, nil
 }
 
 // Runs go mod graph command with fallback.
@@ -407,7 +433,7 @@ func getDependenciesGraphWithFallback(targetRepo string, auth auth.ArtifactoryDe
 	dependenciesMap := map[string]bool{}
 	modulesWithErrors := map[string]previousTries{}
 	usedProxy := true
-	for true {
+	for {
 		// Configuring each run to use Artifactory/VCS
 		err := setOrUnsetGoProxy(usedProxy, targetRepo, auth)
 		if err != nil {

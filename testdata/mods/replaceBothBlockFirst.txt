@@ -1,0 +1,14 @@
+module jfrog.com/jfrog-router
+
+require (
+        code.cloudfoundry.org/clock v0.0.0-20180518195852-02e53af36e6c // indirect
+        contrib.go.opencensus.io/exporter/ocagent v0.4.6 // indirect
+)
+
+replace (
+        github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible
+        github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1
+)
+
+replace github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible
+replace github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1
