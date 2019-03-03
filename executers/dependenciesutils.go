@@ -169,7 +169,7 @@ func goModEncode(name string) string {
 	return path
 }
 
-// Returns the value with upper case.
+// Returns the path to the dependency decoded form lower case to upper case
 // If in the path there are capital letters, the Go convention is to use "!" before the letter.
 // The letter itself in lowercase. This function will decode back to Upper case
 func goModDecode(name string) string {

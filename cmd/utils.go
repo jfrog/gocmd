@@ -14,8 +14,16 @@ import (
 	"strings"
 )
 
+func prepareRegExp() error {
+	err := prepareGlobalRegExp()
+	if err != nil {
+		return err
+	}
+	return prepareNotFoundZipRegExp()
+}
+
 // Compiles all the regex once
-func prepareCmdOutputPattern() error {
+func prepareGlobalRegExp() error {
 	var err error
 	if protocolRegExp == nil {
 		log.Debug("Initializing protocol regexp")
@@ -24,29 +32,37 @@ func prepareCmdOutputPattern() error {
 			return err
 		}
 	}
-	if notFoundRegExp == nil || unrecognizedImportRegExp == nil || unknownRevisionRegExp == nil {
-		if notFoundRegExp == nil {
-			log.Debug("Initializing not found regexp")
-			notFoundRegExp, err = initRegExp(`^go: ([^\/\r\n]+\/[^\r\n\s:]*).*(404( Not Found)?[\s]?)$`, Error)
-			if err != nil {
-				return err
-			}
-		}
 
-		if unrecognizedImportRegExp == nil {
-			log.Debug("Initializing unrecognized import path regexp")
-			unrecognizedImportRegExp, err = initRegExp(`[^go:]([^\/\r\n]+\/[^\r\n\s:]*).*(unrecognized import path)`, Error)
-			if err != nil {
-				return err
-			}
-		}
-
-		if unknownRevisionRegExp == nil {
-			log.Debug("Initializing unknown revision regexp")
-			unknownRevisionRegExp, err = initRegExp(`[^go:]([^\/\r\n]+\/[^\r\n\s:]*).*(unknown revision)`, Error)
+	if notFoundRegExp == nil {
+		log.Debug("Initializing not found regexp")
+		notFoundRegExp, err = initRegExp(`^go: ([^\/\r\n]+\/[^\r\n\s:]*).*(404( Not Found)?[\s]?)$`, Error)
+		if err != nil {
+			return err
 		}
 	}
 
+	if unrecognizedImportRegExp == nil {
+		log.Debug("Initializing unrecognized import path regexp")
+		unrecognizedImportRegExp, err = initRegExp(`[^go:]([^\/\r\n]+\/[^\r\n\s:]*).*(unrecognized import path)`, Error)
+		if err != nil {
+			return err
+		}
+	}
+
+	if unknownRevisionRegExp == nil {
+		log.Debug("Initializing unknown revision regexp")
+		unknownRevisionRegExp, err = initRegExp(`[^go:]([^\/\r\n]+\/[^\r\n\s:]*).*(unknown revision)`, Error)
+	}
+
+	return err
+}
+
+func prepareNotFoundZipRegExp() error {
+	var err error
+	if notFoundZipRegExp == nil {
+		log.Debug("Initializing not found zip file")
+		notFoundZipRegExp, err = initRegExp(`unknown import path ["]([^\/\r\n]+\/[^\r\n\s:]*)["].*(404( Not Found)?[\s]?)$`, Error)
+	}
 	return err
 }
 
