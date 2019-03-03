@@ -111,11 +111,11 @@ func downloadDependencies(targetRepo string, cache *cache.DependenciesCache, dep
 		}
 
 		if resp.StatusCode == 200 {
-			cacheDependenciesMap[getDependencyToLowerCase(nameAndVersion[0])+":"+getDependencyToLowerCase(nameAndVersion[1])] = true
+			cacheDependenciesMap[goModEncode(nameAndVersion[0])+":"+goModEncode(nameAndVersion[1])] = true
 			err = downloadDependency(true, module, targetRepo, auth)
 			dependenciesMap[module] = true
 		} else if resp.StatusCode == 404 {
-			cacheDependenciesMap[getDependencyToLowerCase(nameAndVersion[0])+":"+getDependencyToLowerCase(nameAndVersion[1])] = false
+			cacheDependenciesMap[goModEncode(nameAndVersion[0])+":"+goModEncode(nameAndVersion[1])] = false
 			err = downloadDependency(false, module, targetRepo, nil)
 			dependenciesMap[module] = false
 		}
@@ -154,17 +154,35 @@ func createDependencyInTemp(zipPath string) (tempDir string, err error) {
 	return tempDir, nil
 }
 
-func replaceExclamationMarkWithUpperCase(moduleName string) string {
+// Returns the actual path to the dependency.
+// If in the path there are capital letters, the Go convention is to use "!" before the letter.
+// The letter itself in lowercase.
+func goModEncode(name string) string {
+	path := ""
+	for _, letter := range name {
+		if unicode.IsUpper(letter) {
+			path += "!" + strings.ToLower(string(letter))
+		} else {
+			path += string(letter)
+		}
+	}
+	return path
+}
+
+// Returns the value with upper case.
+// If in the path there are capital letters, the Go convention is to use "!" before the letter.
+// The letter itself in lowercase. This function will decode back to Upper case
+func goModDecode(name string) string {
 	var str string
-	for i := 0; i < len(moduleName); i++ {
-		if string(moduleName[i]) == "!" {
-			if i < len(moduleName)-1 {
-				r := rune(moduleName[i+1])
+	for i := 0; i < len(name); i++ {
+		if string(name[i]) == "!" {
+			if i < len(name)-1 {
+				r := rune(name[i+1])
 				str += string(unicode.ToUpper(r))
 				i++
 			}
 		} else {
-			str += string(moduleName[i])
+			str += string(name[i])
 		}
 	}
 	return str
@@ -248,8 +266,8 @@ func GetDependencies(cachePath string, moduleSlice map[string]bool) ([]Package, 
 	var deps []Package
 	for module := range moduleSlice {
 		moduleInfo := strings.Split(module, "@")
-		name := getDependencyToLowerCase(moduleInfo[0])
-		dep, err := createDependency(cachePath, name, getDependencyToLowerCase(moduleInfo[1]))
+		name := goModEncode(moduleInfo[0])
+		dep, err := createDependency(cachePath, name, goModEncode(moduleInfo[1]))
 		if err != nil {
 			return nil, err
 		}
@@ -258,21 +276,6 @@ func GetDependencies(cachePath string, moduleSlice map[string]bool) ([]Package, 
 		}
 	}
 	return deps, nil
-}
-
-// Returns the actual path to the dependency.
-// If in the path there are capital letters, the Go convention is to use "!" before the letter.
-// The letter itself in lowercase.
-func getDependencyToLowerCase(upperCaseValue string) string {
-	path := ""
-	for _, letter := range upperCaseValue {
-		if unicode.IsUpper(letter) {
-			path += "!" + strings.ToLower(string(letter))
-		} else {
-			path += string(letter)
-		}
-	}
-	return path
 }
 
 // Creates a go dependency.

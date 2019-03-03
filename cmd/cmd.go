@@ -71,10 +71,19 @@ func RunGo(goArg []string) error {
 		return err
 	}
 	goCmd.Command = goArg
-	err = prepareCmdOutputPattern(true)
+	err = prepareCmdOutputPattern()
 	if err != nil {
 		return err
 	}
+
+	if notFoundZipRegExp == nil {
+		log.Debug("Initializing not found zip file")
+		notFoundZipRegExp, err = initRegExp(`unknown import path ["]([^\/\r\n]+\/[^\r\n\s:]*)["].*(404( Not Found)?[\s]?)$`, Error)
+		if err != nil {
+			return err
+		}
+	}
+
 	_, _, err = gofrogcmd.RunCmdWithOutputParser(goCmd, true, protocolRegExp, notFoundRegExp, unrecognizedImportRegExp, unknownRevisionRegExp, notFoundZipRegExp)
 	return errorutils.CheckError(err)
 }
@@ -120,7 +129,7 @@ func GetDependenciesGraph() (map[string]bool, error) {
 	}
 	goCmd.Command = []string{"mod", "graph"}
 
-	err = prepareCmdOutputPattern(false)
+	err = prepareCmdOutputPattern()
 	if err != nil {
 		return nil, err
 	}
