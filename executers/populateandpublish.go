@@ -2,6 +2,12 @@ package executers
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
+
 	"github.com/jfrog/gocmd/cache"
 	"github.com/jfrog/gocmd/cmd"
 	"github.com/jfrog/gocmd/executers/utils"
@@ -11,11 +17,6 @@ import (
 	"github.com/jfrog/jfrog-client-go/utils/errorutils"
 	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
 	"github.com/jfrog/jfrog-client-go/utils/log"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"regexp"
-	"strings"
 )
 
 // Represents go dependency when running with go-recursive-publish set to true.
@@ -135,8 +136,7 @@ func (pwd *PackageWithDeps) createDependencyAndPrepareMod(cache *cache.Dependenc
 	} else {
 		published, _ := cache.GetMap()[pwd.Dependency.GetId()]
 		if !published {
-			output, err = pwd.prepareUnpublishedDependency(path)
-			return
+			pwd.prepareUnpublishedDependency(path)
 		} else {
 			pwd.prepareResolvedDependency(path)
 		}
@@ -169,48 +169,19 @@ func (pwd *PackageWithDeps) prepareAndRunTidy(path string, originalModContent []
 	pwd.originalModContent = originalModContent
 }
 
-func (pwd *PackageWithDeps) prepareUnpublishedDependency(pathToModFile string) (output map[string]bool, err error) {
-	err = pwd.prepareAndRunInit(pathToModFile)
-	if err != nil {
-		log.Error(err)
-		exists, err := fileutils.IsFileExists(pathToModFile, false)
-		utils.LogError(err)
-		if !exists {
-			// Create a mod file
-			err = writeModContentToModFile(pathToModFile, pwd.Dependency.GetModContent())
-			utils.LogError(err)
-		}
-	}
-	// Got here means init worked or mod was created. Need to check the content if mod is empty or not
-	modContent, err := ioutil.ReadFile(pathToModFile)
+func (pwd *PackageWithDeps) prepareUnpublishedDependency(path string) {
+	// Put the mod file to temp
+	err := writeModContentToModFile(path, pwd.Dependency.GetModContent())
 	utils.LogError(err)
-	originalModContent := pwd.Dependency.GetModContent()
-	pwd.Dependency.SetModContent(modContent)
 	// If not empty --> use the mod file and don't run go mod tidy
 	// If empty --> Run go mod tidy. Publish the package with empty mod file.
 	if !pwd.PatternMatched(pwd.regExp.GetNotEmptyModRegex()) {
-		log.Debug("The mod still empty after running 'go mod init' for:", pwd.Dependency.GetId())
-		pwd.prepareAndRunTidy(pathToModFile, originalModContent)
-		output, err = runGoModGraph()
-		return
+		log.Debug("The mod still empty after downloading from VCS:", pwd.Dependency.GetId())
+		originalModContent := pwd.Dependency.GetModContent()
+		pwd.prepareAndRunTidy(path, originalModContent)
 	} else {
-		log.Debug("Project mod file after init is not empty", pwd.Dependency.id)
-		pwd.signModFile()
-		output, err = runGoModGraph()
-		if err != nil {
-			log.Debug(fmt.Sprintf("Command go mod graph finished with the following error: %s for dependency %s", err.Error(), pwd.Dependency.GetId()))
-			// Graph failed after init. Lets return to empty mod and then run tidy on it and graph again.
-			// First create an empty mod.
-			utils.LogError(writeModContentToModFile(pathToModFile, originalModContent))
-			pwd.Dependency.SetModContent(originalModContent)
-			pwd.prepareAndRunTidy(pathToModFile, originalModContent)
-			output, err = runGoModGraph()
-		} else {
-			err := pwd.writeModContentToGoCache()
-			utils.LogError(err)
-		}
+		log.Debug("Project mod file is not empty after downloading from VCS", pwd.Dependency.id)
 	}
-	return
 }
 
 func (pwd *PackageWithDeps) useCachedMod(path string) error {
