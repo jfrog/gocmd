@@ -3,6 +3,13 @@ package executers
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+	"unicode"
+
 	"github.com/jfrog/gocmd/cache"
 	"github.com/jfrog/gocmd/cmd"
 	"github.com/jfrog/gocmd/executers/utils"
@@ -17,12 +24,6 @@ import (
 	"github.com/jfrog/jfrog-client-go/utils/io/fileutils/checksum"
 	"github.com/jfrog/jfrog-client-go/utils/log"
 	"github.com/pkg/errors"
-	"io/ioutil"
-	"net/http"
-	"os"
-	"path/filepath"
-	"strings"
-	"unicode"
 )
 
 const (
@@ -510,7 +511,11 @@ func removeGoSum(path string) error {
 	return nil
 }
 
-func runGoModGraph() (output map[string]bool, err error) {
+func runGoModGraph(path string) (output map[string]bool, err error) {
+	err = os.Chdir(filepath.Dir(path))
+	if errorutils.CheckError(err) != nil {
+		return nil, err
+	}
 	// Running go mod graph command
 	return cmd.GetDependenciesGraph()
 }

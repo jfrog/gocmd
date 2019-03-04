@@ -141,7 +141,7 @@ func (pwd *PackageWithDeps) createDependencyAndPrepareMod(cache *cache.Dependenc
 			pwd.prepareResolvedDependency(path)
 		}
 	}
-	output, err = runGoModGraph()
+	output, err = runGoModGraph(path)
 	return
 }
 
@@ -163,9 +163,6 @@ func (pwd *PackageWithDeps) prepareResolvedDependency(path string) {
 func (pwd *PackageWithDeps) prepareAndRunTidy(path string, originalModContent []byte) {
 	err := populateModWithTidy(path)
 	utils.LogError(err)
-	err = pwd.writeModContentToGoCache()
-	utils.LogError(err)
-	pwd.shouldRevertToEmptyMod = true
 	pwd.originalModContent = originalModContent
 }
 
