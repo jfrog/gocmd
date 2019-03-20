@@ -2,15 +2,16 @@ package cmd
 
 import (
 	"errors"
-	gofrogcmd "github.com/jfrog/gofrog/io"
-	"github.com/jfrog/jfrog-client-go/utils/errorutils"
-	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
-	"github.com/jfrog/jfrog-client-go/utils/log"
 	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
+
+	gofrogcmd "github.com/jfrog/gofrog/io"
+	"github.com/jfrog/jfrog-client-go/utils/errorutils"
+	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
+	"github.com/jfrog/jfrog-client-go/utils/log"
 )
 
 var protocolRegExp *gofrogcmd.CmdOutputPattern
@@ -75,7 +76,7 @@ func RunGo(goArg []string) error {
 	if err != nil {
 		return err
 	}
-	_, _, err = gofrogcmd.RunCmdWithOutputParser(goCmd, true, protocolRegExp, notFoundRegExp, unrecognizedImportRegExp, unknownRevisionRegExp, notFoundZipRegExp)
+	_, _, _, err = gofrogcmd.RunCmdWithOutputParser(goCmd, true, protocolRegExp, notFoundRegExp, unrecognizedImportRegExp, unknownRevisionRegExp, notFoundZipRegExp)
 	return errorutils.CheckError(err)
 }
 
@@ -124,7 +125,7 @@ func GetDependenciesGraph() (map[string]bool, error) {
 	if err != nil {
 		return nil, err
 	}
-	output, _, err := gofrogcmd.RunCmdWithOutputParser(goCmd, true, protocolRegExp, notFoundRegExp, unrecognizedImportRegExp, unknownRevisionRegExp)
+	output, errorOutput, _, err := gofrogcmd.RunCmdWithOutputParser(goCmd, true, protocolRegExp, notFoundRegExp, unrecognizedImportRegExp, unknownRevisionRegExp)
 	if len(output) != 0 {
 		log.Debug(output)
 	}
@@ -141,7 +142,7 @@ func GetDependenciesGraph() (map[string]bool, error) {
 		return nil, err
 	}
 
-	return outputToMap(output), errorutils.CheckError(err)
+	return outputToMap(output, errorOutput), errorutils.CheckError(err)
 }
 
 // Using go mod download command to download all the dependencies before publishing to Artifactory
@@ -175,7 +176,7 @@ func RunGoModInit(moduleName string) error {
 	}
 
 	goCmd.Command = []string{"mod", "init", moduleName}
-	_, _, err = gofrogcmd.RunCmdWithOutputParser(goCmd, true)
+	_, _, _, err = gofrogcmd.RunCmdWithOutputParser(goCmd, true)
 	return err
 }
 

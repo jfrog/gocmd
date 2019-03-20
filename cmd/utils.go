@@ -3,15 +3,16 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"strings"
+
 	gofrogio "github.com/jfrog/gofrog/io"
 	"github.com/jfrog/jfrog-client-go/utils"
 	"github.com/jfrog/jfrog-client-go/utils/errorutils"
 	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
 	"github.com/jfrog/jfrog-client-go/utils/log"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"strings"
 )
 
 func prepareRegExp() error {
@@ -136,16 +137,28 @@ func GetFileDetails(filePath string) (modFileContent []byte, modFileStat os.File
 	return
 }
 
-func outputToMap(output string) map[string]bool {
-	lineOutput := strings.Split(output, "\n")
-	var result []string
+func outputToMap(output string, errorOutput string) map[string]bool {
 	mapOfDeps := map[string]bool{}
+
+	// Parse dependency graph output
+	lineOutput := strings.Split(output, "\n")
 	for _, line := range lineOutput {
 		splitLine := strings.Split(line, " ")
 		if len(splitLine) == 2 {
 			mapOfDeps[splitLine[1]] = true
-			result = append(result, splitLine[1])
 		}
 	}
+
+	// Parse dependency resolution output, sent to the error output by go mod graph
+	lineOutput = strings.Split(errorOutput, "\n")
+	for _, line := range lineOutput {
+		if strings.HasPrefix(line, "go: finding") {
+			lineContent := line[12:]
+			dependencyParts := strings.Split(lineContent, " ")
+			dependency := fmt.Sprintf("%s@%s", dependencyParts[0], dependencyParts[1])
+			mapOfDeps[dependency] = true
+		}
+	}
+
 	return mapOfDeps
 }
