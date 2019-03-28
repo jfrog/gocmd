@@ -42,7 +42,7 @@ func RecursivePublish(targetRepo, goModEditMessage string, serviceManager *artif
 	if err != nil {
 		return err
 	}
-	collectDependenciesAndPublish(targetRepo, false, pwd, serviceManager)
+	collectDependenciesAndPublish(targetRepo, false, true, pwd, serviceManager)
 	return nil
 }
 

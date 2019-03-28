@@ -31,7 +31,7 @@ const (
 )
 
 // Resolve artifacts from VCS and publish the missing artifacts to Artifactory
-func collectDependenciesAndPublish(targetRepo string, failOnError bool, dependenciesInterface GoPackage, serviceManager *artifactory.ArtifactoryServicesManager) error {
+func collectDependenciesAndPublish(targetRepo string, failOnError, publishDeps bool, dependenciesInterface GoPackage, serviceManager *artifactory.ArtifactoryServicesManager) error {
 	rootProjectDir, err := cmd.GetProjectRoot()
 	if err != nil {
 		return err
@@ -48,9 +48,12 @@ func collectDependenciesAndPublish(targetRepo string, failOnError bool, dependen
 		}
 		log.Error("Received an error retrieving project dependencies:", err)
 	}
-	err = populateAndPublish(targetRepo, cachePath, dependenciesInterface, packageDependencies, &cache, serviceManager)
-	if err != nil {
-		return err
+
+	if publishDeps {
+		err = populateAndPublish(targetRepo, cachePath, dependenciesInterface, packageDependencies, &cache, serviceManager)
+		if err != nil {
+			return err
+		}
 	}
 	utils.LogFinishedMsg(&cache)
 	return nil
