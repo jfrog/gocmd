@@ -9,7 +9,7 @@ import (
 )
 
 // Runs Go, with multiple fallbacks if needed and publish missing dependencies to Artifactory
-func RunWithFallbacksAndPublish(goArg []string, targetRepo string, noRegistry bool, serviceManager *artifactory.ArtifactoryServicesManager) error {
+func RunWithFallbacksAndPublish(goArg []string, targetRepo string, noRegistry, publishDeps bool, serviceManager *artifactory.ArtifactoryServicesManager) error {
 	if !noRegistry {
 		artDetails := serviceManager.GetConfig().GetArtDetails()
 		err := utils.SetGoProxyWithApi(targetRepo, artDetails)
@@ -28,7 +28,7 @@ func RunWithFallbacksAndPublish(goArg []string, targetRepo string, noRegistry bo
 				return err
 			}
 
-			err = collectDependenciesAndPublish(targetRepo, true,  &Package{}, serviceManager)
+			err = collectDependenciesAndPublish(targetRepo, true, publishDeps, &Package{}, serviceManager)
 			if err != nil {
 				return err
 			}
