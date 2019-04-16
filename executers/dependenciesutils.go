@@ -138,20 +138,16 @@ func performHeadRequest(auth auth.ArtifactoryDetails, client *httpclient.HttpCli
 }
 
 // Creating dependency with the mod file in the temp directory
-func createDependencyInTemp(zipPath string) (tempDir string, err error) {
-	tempDir, err = fileutils.GetTempDirPath()
-	if err != nil {
-		return "", err
-	}
+func createDependencyInTemp(zipPath, tempDir string) (err error) {
 	multiReader, err := multifilereader.NewMultiFileReaderAt([]string{zipPath})
 	if err != nil {
-		return "", errorutils.CheckError(err)
+		return errorutils.CheckError(err)
 	}
 	err = fileutils.Unzip(multiReader, multiReader.Size(), tempDir)
 	if err != nil {
-		return "", errorutils.CheckError(err)
+		return errorutils.CheckError(err)
 	}
-	return tempDir, nil
+	return nil
 }
 
 // Returns the actual path to the dependency.

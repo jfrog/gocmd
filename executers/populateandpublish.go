@@ -28,16 +28,17 @@ type PackageWithDeps struct {
 	cachePath              string
 	GoModEditMessage       string
 	originalModContent     []byte
+	depsTempDir            string
 }
 
 // Populates and publish the dependencies.
 func RecursivePublish(targetRepo, goModEditMessage string, serviceManager *artifactory.ArtifactoryServicesManager) error {
-	err := fileutils.CreateTempDirPath()
+	tempDirPath, err := fileutils.CreateTempDir()
 	if err != nil {
 		return err
 	}
-	defer fileutils.RemoveTempDir()
-	pwd := &PackageWithDeps{GoModEditMessage: goModEditMessage}
+	defer fileutils.RemoveTempDir(tempDirPath)
+	pwd := &PackageWithDeps{GoModEditMessage: goModEditMessage, depsTempDir: tempDirPath}
 	err = pwd.Init()
 	if err != nil {
 		return err
@@ -232,11 +233,11 @@ func (pwd *PackageWithDeps) getModPathAndUnzipDependency(path string) (string, e
 		return "", err
 	}
 	// Unzips the zip file into temp
-	tempDir, err := createDependencyInTemp(pwd.Dependency.GetZipPath())
+	err = createDependencyInTemp(pwd.Dependency.GetZipPath(), pwd.depsTempDir)
 	if err != nil {
 		return "", err
 	}
-	path = pwd.getModPathInTemp(tempDir)
+	path = pwd.getModPathInTemp(pwd.depsTempDir)
 	return path, err
 }
 
@@ -362,7 +363,8 @@ func (pwd *PackageWithDeps) setTransitiveDependencies(targetRepo string, graphDe
 					depsWithTrans := &PackageWithDeps{Dependency: dep,
 						regExp:           pwd.regExp,
 						cachePath:        pwd.cachePath,
-						GoModEditMessage: pwd.GoModEditMessage}
+						GoModEditMessage: pwd.GoModEditMessage,
+						depsTempDir:      pwd.depsTempDir}
 					dependencies = append(dependencies, *depsWithTrans)
 					dependenciesMap[name+":"+version] = downloadedFromArtifactory
 				}
