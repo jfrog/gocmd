@@ -67,11 +67,11 @@ func TestEncodeDecodePath(t *testing.T) {
 }
 
 func TestCreateDependency(t *testing.T) {
-	err := fileutils.CreateTempDirPath()
+	tempDirPath, err := fileutils.CreateTempDir()
 	if err != nil {
 		t.Error(err)
 	}
-	defer fileutils.RemoveTempDir()
+	defer fileutils.RemoveTempDir(tempDirPath)
 	baseDir, err := getBaseDir()
 	if err != nil {
 		t.Error(err)
@@ -83,11 +83,11 @@ func TestCreateDependency(t *testing.T) {
 		modContent: []byte(modContent),
 		zipPath:    filepath.Join(cachePath, "v1.2.3.zip"),
 	}
-	tempDir, err := createDependencyInTemp(dep.GetZipPath())
+	err = createDependencyInTemp(dep.GetZipPath(), tempDirPath)
 	if err != nil {
 		t.Error(err)
 	}
-	path := filepath.Join(tempDir, "github.com", "test@v1.2.3", "test.go")
+	path := filepath.Join(tempDirPath, "github.com", "test@v1.2.3", "test.go")
 
 	exists, err := fileutils.IsFileExists(path, false)
 	if err != nil {
@@ -97,18 +97,18 @@ func TestCreateDependency(t *testing.T) {
 	if !exists {
 		t.Error(fmt.Sprintf("Missing %s", path))
 	}
-	err = os.RemoveAll(filepath.Join(tempDir, "github.com"))
+	err = os.RemoveAll(filepath.Join(tempDirPath, "github.com"))
 	if err != nil {
 		t.Error(err)
 	}
 }
 
 func TestGetModPath(t *testing.T) {
-	err := fileutils.CreateTempDirPath()
+	tempDirPath, err := fileutils.CreateTempDir()
 	if err != nil {
 		t.Error(err)
 	}
-	defer fileutils.RemoveTempDir()
+	defer fileutils.RemoveTempDir(tempDirPath)
 	baseDir, err := getBaseDir()
 	if err != nil {
 		t.Error(err)
@@ -120,18 +120,18 @@ func TestGetModPath(t *testing.T) {
 		modContent: []byte(modContent),
 		zipPath:    filepath.Join(cachePath, "v1.2.3.zip"),
 	}
-	pwd := PackageWithDeps{Dependency: &dep}
-	tempDir, err := createDependencyInTemp(dep.GetZipPath())
+	pwd := PackageWithDeps{Dependency: &dep, depsTempDir: tempDirPath}
+	err = createDependencyInTemp(dep.GetZipPath(), tempDirPath)
 	if err != nil {
 		t.Error(err)
 	}
-	modPath := pwd.getModPathInTemp(tempDir)
-	path := filepath.Join(tempDir, "github.com", "test@v1.2.3", "go.mod")
+	modPath := pwd.getModPathInTemp(tempDirPath)
+	path := filepath.Join(tempDirPath, "github.com", "test@v1.2.3", "go.mod")
 	if path != modPath {
 		t.Error(fmt.Sprintf("Expected %s, got %s", path, modPath))
 	}
 
-	err = os.RemoveAll(filepath.Join(tempDir, "github.com"))
+	err = os.RemoveAll(filepath.Join(tempDirPath, "github.com"))
 	if err != nil {
 		t.Error(err)
 	}
