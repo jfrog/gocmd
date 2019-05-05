@@ -37,8 +37,20 @@ func SetGoProxyWithApi(repoName string, details auth.ArtifactoryDetails) error {
 	if err != nil {
 		return errorutils.CheckError(err)
 	}
+
 	username := details.GetUser()
 	password := details.GetPassword()
+
+	// Get credentials from access-token if exists.
+	if details.GetAccessToken() != "" {
+		log.Debug("Using proxy with access-token.")
+		username, err = auth.ExtractUsernameFromAccessToken(details.GetAccessToken())
+		if err != nil {
+			return err
+		}
+		password = details.GetAccessToken()
+	}
+
 	if username != "" && password != "" {
 		rtUrl.User = url.UserPassword(username, password)
 	}
