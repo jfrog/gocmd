@@ -6,6 +6,7 @@ import (
 	"github.com/jfrog/gocmd/cache"
 	"github.com/jfrog/gocmd/cmd"
 	"github.com/jfrog/gocmd/executers/utils"
+	"github.com/jfrog/gocmd/params"
 	"github.com/jfrog/jfrog-client-go/artifactory"
 	"github.com/jfrog/jfrog-client-go/artifactory/auth"
 	"github.com/jfrog/jfrog-client-go/artifactory/buildinfo"
@@ -21,6 +22,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"unicode"
 )
@@ -31,13 +33,14 @@ const (
 )
 
 // Resolve artifacts from VCS and publish the missing artifacts to Artifactory
-func collectDependenciesAndPublish(targetRepo string, failOnError, publishDeps bool, dependenciesInterface GoPackage, serviceManager *artifactory.ArtifactoryServicesManager) error {
+func collectDependenciesAndPublish(failOnError, publishDeps bool, dependenciesInterface GoPackage, resolverDeployer *params.GoResolverDeployer) error {
 	rootProjectDir, err := cmd.GetProjectRoot()
 	if err != nil {
 		return err
 	}
 	cache := cache.DependenciesCache{}
-	dependenciesToPublish, err := collectProjectDependencies(targetRepo, rootProjectDir, &cache, serviceManager.GetConfig().GetArtDetails())
+	// The collection of project dependencies requires the resolver information
+	dependenciesToPublish, err := collectProjectDependencies(resolverDeployer.Resolver().Repo(), rootProjectDir, &cache, resolverDeployer.Resolver().ServiceManager().GetConfig().GetArtDetails())
 	if err != nil || len(dependenciesToPublish) == 0 {
 		return err
 	}
@@ -49,13 +52,48 @@ func collectDependenciesAndPublish(targetRepo string, failOnError, publishDeps b
 		log.Error("Received an error retrieving project dependencies:", err)
 	}
 
+	// If the publish is done to a different server then the resolver, need to check
+	// which dependencies cached in the deploy server since could be that
+	// a dependency didn't exists in the resolver server but exists in the deployer server
+	// so in such scenario this dependency will not need to be published again.
+	if publishDeps && !reflect.DeepEqual(resolverDeployer.Resolver(), resolverDeployer.Deployer()) {
+		err = prepareDependenciesForDeployerServer(&cache, dependenciesToPublish, resolverDeployer)
+		if err != nil {
+			return err
+		}
+	}
+
 	if publishDeps {
-		err = populateAndPublish(targetRepo, cachePath, dependenciesInterface, packageDependencies, &cache, serviceManager)
+		err = populateAndPublish(resolverDeployer.Deployer().Repo(), cachePath, dependenciesInterface, packageDependencies, &cache, resolverDeployer.Deployer().ServiceManager())
 		if err != nil {
 			return err
 		}
 	}
 	utils.LogFinishedMsg(&cache)
+	return nil
+}
+
+// Performs a head request to the deployer server to select the dependencies that need to be published to that server
+func prepareDependenciesForDeployerServer(cache *cache.DependenciesCache, dependenciesToPublish map[string]bool, resolverDeployer *params.GoResolverDeployer) error {
+	client, err := httpclient.ClientBuilder().Build()
+	if err != nil {
+		return err
+	}
+	cacheDependenciesMap := cache.GetMap()
+	for module := range dependenciesToPublish {
+		nameAndVersion := strings.Split(module, "@")
+		// Perform a head request for the deployer server
+		resp, err := performHeadRequest(resolverDeployer.Deployer().ServiceManager().GetConfig().GetArtDetails(), client, resolverDeployer.Deployer().Repo(), nameAndVersion[0], nameAndVersion[1])
+		if err != nil {
+			return err
+		}
+		// Change the cache map to indicate which dependencies are missing in the deployer server.
+		if resp.StatusCode == 200 {
+			cacheDependenciesMap[goModEncode(nameAndVersion[0])+":"+goModEncode(nameAndVersion[1])] = true
+		} else if resp.StatusCode == 404 {
+			cacheDependenciesMap[goModEncode(nameAndVersion[0])+":"+goModEncode(nameAndVersion[1])] = false
+		}
+	}
 	return nil
 }
 

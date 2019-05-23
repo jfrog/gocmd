@@ -5,6 +5,7 @@ import (
 	"github.com/jfrog/gocmd/cache"
 	"github.com/jfrog/gocmd/cmd"
 	"github.com/jfrog/gocmd/executers/utils"
+	"github.com/jfrog/gocmd/params"
 	"github.com/jfrog/jfrog-client-go/artifactory"
 	"github.com/jfrog/jfrog-client-go/artifactory/auth"
 	"github.com/jfrog/jfrog-client-go/httpclient"
@@ -32,7 +33,7 @@ type PackageWithDeps struct {
 }
 
 // Populates and publish the dependencies.
-func RecursivePublish(targetRepo, goModEditMessage string, serviceManager *artifactory.ArtifactoryServicesManager) error {
+func RecursivePublish(goModEditMessage string, resolverDeployer *params.GoResolverDeployer) error {
 	tempDirPath, err := fileutils.CreateTempDir()
 	if err != nil {
 		return err
@@ -43,7 +44,7 @@ func RecursivePublish(targetRepo, goModEditMessage string, serviceManager *artif
 	if err != nil {
 		return err
 	}
-	collectDependenciesAndPublish(targetRepo, false, true, pwd, serviceManager)
+	collectDependenciesAndPublish(false, true, pwd, resolverDeployer)
 	return nil
 }
 
