@@ -2,15 +2,15 @@ package gocmd
 
 import (
 	"github.com/jfrog/gocmd/executers"
-	"github.com/jfrog/jfrog-client-go/artifactory"
+	"github.com/jfrog/gocmd/params"
 )
 
-func RecursivePublish(targetRepo, goModEditMessage string, serviceManager *artifactory.ArtifactoryServicesManager) error {
-	return executers.RecursivePublish(targetRepo, goModEditMessage, serviceManager)
+func RecursivePublish(goModEditMessage string, resolverDeployer *params.ResolverDeployer) error {
+	return executers.RecursivePublish(goModEditMessage, resolverDeployer)
 }
 
-func RunWithFallbacksAndPublish(goArg []string, targetRepo string, noRegistry, publishDeps bool, serviceManager *artifactory.ArtifactoryServicesManager) error {
-	return executers.RunWithFallbacksAndPublish(goArg, targetRepo, noRegistry, publishDeps, serviceManager)
+func RunWithFallbacksAndPublish(goArg []string, noRegistry, publishDeps bool, resolverDeployer *params.ResolverDeployer) error {
+	return executers.RunWithFallbacksAndPublish(goArg, noRegistry, publishDeps, resolverDeployer)
 }
 
 func RunWithFallback(goArg []string, url string) error {

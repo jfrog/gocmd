@@ -1,18 +1,24 @@
 package executers
 
 import (
+	"fmt"
 	"github.com/jfrog/gocmd/cmd"
 	"github.com/jfrog/gocmd/executers/utils"
-	"github.com/jfrog/jfrog-client-go/artifactory"
+	"github.com/jfrog/gocmd/params"
+	"github.com/jfrog/jfrog-client-go/utils/errorutils"
 	"github.com/jfrog/jfrog-client-go/utils/log"
 	"os"
 )
 
 // Runs Go, with multiple fallbacks if needed and publish missing dependencies to Artifactory
-func RunWithFallbacksAndPublish(goArg []string, targetRepo string, noRegistry, publishDeps bool, serviceManager *artifactory.ArtifactoryServicesManager) error {
+func RunWithFallbacksAndPublish(goArg []string, noRegistry, publishDeps bool, resolverDeployer *params.ResolverDeployer) error {
 	if !noRegistry {
-		artDetails := serviceManager.GetConfig().GetArtDetails()
-		err := utils.SetGoProxyWithApi(targetRepo, artDetails)
+		resolver := resolverDeployer.Resolver()
+		if resolver == nil || resolver.IsEmpty() {
+			return errorutils.CheckError(fmt.Errorf("Missing resolver information"))
+		}
+		artDetails := resolver.ServiceManager().GetConfig().GetArtDetails()
+		err := utils.SetGoProxyWithApi(resolverDeployer.Resolver().Repo(), artDetails)
 		if err != nil {
 			return err
 		}
@@ -28,7 +34,7 @@ func RunWithFallbacksAndPublish(goArg []string, targetRepo string, noRegistry, p
 				return err
 			}
 
-			err = collectDependenciesAndPublish(targetRepo, true, publishDeps, &Package{}, serviceManager)
+			err = collectDependenciesAndPublish(true, publishDeps, &Package{}, resolverDeployer)
 			if err != nil {
 				return err
 			}

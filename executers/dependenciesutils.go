@@ -6,6 +6,7 @@ import (
 	"github.com/jfrog/gocmd/cache"
 	"github.com/jfrog/gocmd/cmd"
 	"github.com/jfrog/gocmd/executers/utils"
+	"github.com/jfrog/gocmd/params"
 	"github.com/jfrog/jfrog-client-go/artifactory"
 	"github.com/jfrog/jfrog-client-go/artifactory/auth"
 	"github.com/jfrog/jfrog-client-go/artifactory/buildinfo"
@@ -21,6 +22,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"unicode"
 )
@@ -31,13 +33,14 @@ const (
 )
 
 // Resolve artifacts from VCS and publish the missing artifacts to Artifactory
-func collectDependenciesAndPublish(targetRepo string, failOnError, publishDeps bool, dependenciesInterface GoPackage, serviceManager *artifactory.ArtifactoryServicesManager) error {
+func collectDependenciesAndPublish(failOnError, publishDeps bool, dependenciesInterface GoPackage, resolverDeployer *params.ResolverDeployer) error {
 	rootProjectDir, err := cmd.GetProjectRoot()
 	if err != nil {
 		return err
 	}
 	cache := cache.DependenciesCache{}
-	dependenciesToPublish, err := collectProjectDependencies(targetRepo, rootProjectDir, &cache, serviceManager.GetConfig().GetArtDetails())
+	// The collection of project dependencies requires the resolver information
+	dependenciesToPublish, err := collectProjectDependencies(resolverDeployer.Resolver().Repo(), rootProjectDir, &cache, resolverDeployer.Resolver().ServiceManager().GetConfig().GetArtDetails())
 	if err != nil || len(dependenciesToPublish) == 0 {
 		return err
 	}
@@ -49,13 +52,54 @@ func collectDependenciesAndPublish(targetRepo string, failOnError, publishDeps b
 		log.Error("Received an error retrieving project dependencies:", err)
 	}
 
+	// If need to publish the missing depedencies to Artifactory
 	if publishDeps {
-		err = populateAndPublish(targetRepo, cachePath, dependenciesInterface, packageDependencies, &cache, serviceManager)
+		// If we need publish the missing depedencies to an Artifactory server or repo, which are
+		// different then the resolution repo, then we have no information about which depedencies are actually
+		// missing and therefore should be published.
+		// Let's find out which depedencies are missing.
+		if !reflect.DeepEqual(resolverDeployer.Resolver(), resolverDeployer.Deployer()) {
+			err = findMissingDepedencies(&cache, dependenciesToPublish, resolverDeployer)
+			if err != nil {
+				return err
+			}
+		}
+		// Publish the missing dependencies to Artifactory.
+		err = populateAndPublish(resolverDeployer.Deployer().Repo(), cachePath, dependenciesInterface, packageDependencies, &cache, resolverDeployer.Deployer().ServiceManager())
 		if err != nil {
 			return err
 		}
 	}
+
 	utils.LogFinishedMsg(&cache)
+	return nil
+}
+
+// Performs a head request to the deployer server to select the dependencies that need to be published to that server
+func findMissingDepedencies(cache *cache.DependenciesCache, dependenciesToPublish map[string]bool, resolverDeployer *params.ResolverDeployer) error {
+	client, err := httpclient.ClientBuilder().Build()
+	if err != nil {
+		return err
+	}
+	cacheDependenciesMap := cache.GetMap()
+	for module := range dependenciesToPublish {
+		nameAndVersion := strings.Split(module, "@")
+		// Perform a head request for the deployer server
+		resp, err := performHeadRequest(resolverDeployer.Deployer().ServiceManager().GetConfig().GetArtDetails(), client, resolverDeployer.Deployer().Repo(), nameAndVersion[0], nameAndVersion[1])
+		if err != nil {
+			return err
+		}
+		// Change the cache map to indicate which dependencies are missing in the deployer server.
+		var dependencyExists bool
+		if resp.StatusCode == 200 {
+			dependencyExists = true
+		} else if resp.StatusCode == 404 {
+			dependencyExists = false
+		} else {
+			return errorutils.CheckError(fmt.Errorf("Artifactory response for %s:%d", module, resp.StatusCode))
+		}
+		cacheDependenciesMap[goModEncode(nameAndVersion[0])+":"+goModEncode(nameAndVersion[1])] = dependencyExists
+	}
 	return nil
 }
 
