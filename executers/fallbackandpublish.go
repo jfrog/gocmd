@@ -11,7 +11,7 @@ import (
 )
 
 // Runs Go, with multiple fallbacks if needed and publish missing dependencies to Artifactory
-func RunWithFallbacksAndPublish(goArg []string, noRegistry, publishDeps bool, resolverDeployer *params.GoResolverDeployer) error {
+func RunWithFallbacksAndPublish(goArg []string, noRegistry, publishDeps bool, resolverDeployer *params.ResolverDeployer) error {
 	if !noRegistry {
 		resolver := resolverDeployer.Resolver()
 		if resolver == nil || resolver.IsEmpty() {

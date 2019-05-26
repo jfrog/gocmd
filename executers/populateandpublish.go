@@ -33,7 +33,7 @@ type PackageWithDeps struct {
 }
 
 // Populates and publish the dependencies.
-func RecursivePublish(goModEditMessage string, resolverDeployer *params.GoResolverDeployer) error {
+func RecursivePublish(goModEditMessage string, resolverDeployer *params.ResolverDeployer) error {
 	tempDirPath, err := fileutils.CreateTempDir()
 	if err != nil {
 		return err

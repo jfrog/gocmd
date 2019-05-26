@@ -5,11 +5,11 @@ import (
 	"github.com/jfrog/gocmd/params"
 )
 
-func RecursivePublish(goModEditMessage string, resolverDeployer *params.GoResolverDeployer) error {
+func RecursivePublish(goModEditMessage string, resolverDeployer *params.ResolverDeployer) error {
 	return executers.RecursivePublish(goModEditMessage, resolverDeployer)
 }
 
-func RunWithFallbacksAndPublish(goArg []string, noRegistry, publishDeps bool, resolverDeployer *params.GoResolverDeployer) error {
+func RunWithFallbacksAndPublish(goArg []string, noRegistry, publishDeps bool, resolverDeployer *params.ResolverDeployer) error {
 	return executers.RunWithFallbacksAndPublish(goArg, noRegistry, publishDeps, resolverDeployer)
 }
 

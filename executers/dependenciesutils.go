@@ -33,7 +33,7 @@ const (
 )
 
 // Resolve artifacts from VCS and publish the missing artifacts to Artifactory
-func collectDependenciesAndPublish(failOnError, publishDeps bool, dependenciesInterface GoPackage, resolverDeployer *params.GoResolverDeployer) error {
+func collectDependenciesAndPublish(failOnError, publishDeps bool, dependenciesInterface GoPackage, resolverDeployer *params.ResolverDeployer) error {
 	rootProjectDir, err := cmd.GetProjectRoot()
 	if err != nil {
 		return err
@@ -52,29 +52,31 @@ func collectDependenciesAndPublish(failOnError, publishDeps bool, dependenciesIn
 		log.Error("Received an error retrieving project dependencies:", err)
 	}
 
-	// If the publish is done to a different server then the resolver, need to check
-	// which dependencies cached in the deploy server since could be that
-	// a dependency didn't exists in the resolver server but exists in the deployer server
-	// so in such scenario this dependency will not need to be published again.
-	if publishDeps && !reflect.DeepEqual(resolverDeployer.Resolver(), resolverDeployer.Deployer()) {
-		err = prepareDependenciesForDeployerServer(&cache, dependenciesToPublish, resolverDeployer)
-		if err != nil {
-			return err
-		}
-	}
-
+	// If need to publish the missing depedencies to Artifactory
 	if publishDeps {
+		// If we need publish the missing depedencies to an Artifactory server or repo, which are
+		// different then the resolution repo, then we have no information about which depedencies are actually
+		// missing and therefore should be published.
+		// Let's find out which depedencies are missing.
+		if !reflect.DeepEqual(resolverDeployer.Resolver(), resolverDeployer.Deployer()) {
+			err = findMissingDepedencies(&cache, dependenciesToPublish, resolverDeployer)
+			if err != nil {
+				return err
+			}
+		}
+		// Publish the missing dependencies to Artifactory.
 		err = populateAndPublish(resolverDeployer.Deployer().Repo(), cachePath, dependenciesInterface, packageDependencies, &cache, resolverDeployer.Deployer().ServiceManager())
 		if err != nil {
 			return err
 		}
 	}
+
 	utils.LogFinishedMsg(&cache)
 	return nil
 }
 
 // Performs a head request to the deployer server to select the dependencies that need to be published to that server
-func prepareDependenciesForDeployerServer(cache *cache.DependenciesCache, dependenciesToPublish map[string]bool, resolverDeployer *params.GoResolverDeployer) error {
+func findMissingDepedencies(cache *cache.DependenciesCache, dependenciesToPublish map[string]bool, resolverDeployer *params.ResolverDeployer) error {
 	client, err := httpclient.ClientBuilder().Build()
 	if err != nil {
 		return err
@@ -88,11 +90,15 @@ func prepareDependenciesForDeployerServer(cache *cache.DependenciesCache, depend
 			return err
 		}
 		// Change the cache map to indicate which dependencies are missing in the deployer server.
+		var dependencyExists bool
 		if resp.StatusCode == 200 {
-			cacheDependenciesMap[goModEncode(nameAndVersion[0])+":"+goModEncode(nameAndVersion[1])] = true
+			dependencyExists = true
 		} else if resp.StatusCode == 404 {
-			cacheDependenciesMap[goModEncode(nameAndVersion[0])+":"+goModEncode(nameAndVersion[1])] = false
+			dependencyExists = false
+		} else {
+			return errorutils.CheckError(fmt.Errorf("Artifactory response for %s:%d", module, resp.StatusCode))
 		}
+		cacheDependenciesMap[goModEncode(nameAndVersion[0])+":"+goModEncode(nameAndVersion[1])] = dependencyExists
 	}
 	return nil
 }

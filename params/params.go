@@ -5,53 +5,53 @@ import (
 	"reflect"
 )
 
-type GoResolverDeployer struct {
-	resolver *GoParams
-	deployer *GoParams
+type ResolverDeployer struct {
+	resolver *Params
+	deployer *Params
 }
 
-func (resolverDeployer *GoResolverDeployer) Resolver() *GoParams {
+func (resolverDeployer *ResolverDeployer) Resolver() *Params {
 	return resolverDeployer.resolver
 }
 
-func (resolverDeployer *GoResolverDeployer) SetResolver(resolver *GoParams) *GoResolverDeployer {
+func (resolverDeployer *ResolverDeployer) SetResolver(resolver *Params) *ResolverDeployer {
 	resolverDeployer.resolver = resolver
 	return resolverDeployer
 }
 
-func (resolverDeployer *GoResolverDeployer) Deployer() *GoParams {
+func (resolverDeployer *ResolverDeployer) Deployer() *Params {
 	return resolverDeployer.deployer
 }
 
-func (resolverDeployer *GoResolverDeployer) SetDeployer(deployer *GoParams) *GoResolverDeployer {
+func (resolverDeployer *ResolverDeployer) SetDeployer(deployer *Params) *ResolverDeployer {
 	resolverDeployer.deployer = deployer
 	return resolverDeployer
 }
 
-type GoParams struct {
+type Params struct {
 	repo           string
 	serviceManager *artifactory.ArtifactoryServicesManager
 }
 
-func (goParams *GoParams) Repo() string {
-	return goParams.repo
+func (params *Params) Repo() string {
+	return params.repo
 }
 
-func (goParams *GoParams) SetRepo(repo string) *GoParams {
-	goParams.repo = repo
-	return goParams
+func (params *Params) SetRepo(repo string) *Params {
+	params.repo = repo
+	return params
 }
 
-func (goParams *GoParams) ServiceManager() *artifactory.ArtifactoryServicesManager {
-	return goParams.serviceManager
+func (params *Params) ServiceManager() *artifactory.ArtifactoryServicesManager {
+	return params.serviceManager
 }
 
-func (goParams *GoParams) SetServiceManager(serviceManager *artifactory.ArtifactoryServicesManager) *GoParams {
-	goParams.serviceManager = serviceManager
-	return goParams
+func (params *Params) SetServiceManager(serviceManager *artifactory.ArtifactoryServicesManager) *Params {
+	params.serviceManager = serviceManager
+	return params
 }
 
 // Returns true if goParams is empty
-func (goParams *GoParams) IsEmpty() bool {
-	return reflect.DeepEqual(*goParams, GoParams{})
+func (params *Params) IsEmpty() bool {
+	return reflect.DeepEqual(*params, Params{})
 }
