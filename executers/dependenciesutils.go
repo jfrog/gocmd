@@ -342,6 +342,7 @@ func createDependency(cachePath, dependencyName, version string) (*Package, erro
 	dep.version = version
 	dep.zipPath = zipPath
 	dep.modPath = filepath.Join(cachePath, dependencyName, "@v", version+".mod")
+	dep.infoPath = filepath.Join(cachePath, dependencyName, "@v", version+".info")
 	dep.modContent, err = ioutil.ReadFile(dep.modPath)
 	if err != nil {
 		return &dep, errorutils.CheckError(err)

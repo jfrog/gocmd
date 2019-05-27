@@ -23,6 +23,7 @@ type Package struct {
 	modContent            []byte
 	zipPath               string
 	modPath               string
+	infoPath              string
 	version               string
 }
 
@@ -33,6 +34,7 @@ func (dependencyPackage *Package) New(cachePath string, dep Package) GoPackage {
 	dependencyPackage.id = dep.id
 	dependencyPackage.buildInfoDependencies = dep.buildInfoDependencies
 	dependencyPackage.modPath = dep.modPath
+	dependencyPackage.infoPath = dep.infoPath
 	return dependencyPackage
 }
 
@@ -92,7 +94,7 @@ func (dependencyPackage *Package) Publish(summary string, targetRepo string, ser
 	params.TargetRepo = targetRepo
 	params.ModuleId = dependencyPackage.id
 	params.ModPath = dependencyPackage.modPath
-
+	params.InfoPath = dependencyPackage.infoPath
 	return servicesManager.PublishGoProject(params)
 }
 
