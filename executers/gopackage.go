@@ -34,7 +34,6 @@ func (dependencyPackage *Package) New(cachePath string, dep Package) GoPackage {
 	dependencyPackage.modContent = dep.modContent
 	dependencyPackage.zipPath = dep.zipPath
 	dependencyPackage.version = dep.version
-	dependencyPackage.infoPath = dep.infoPath
 	dependencyPackage.id = dep.id
 	dependencyPackage.buildInfoDependencies = dep.buildInfoDependencies
 	dependencyPackage.modPath = dep.modPath
