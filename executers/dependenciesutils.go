@@ -1,7 +1,6 @@
 package executers
 
 import (
-	"bytes"
 	"fmt"
 	"github.com/jfrog/gocmd/cache"
 	"github.com/jfrog/gocmd/cmd"
@@ -9,13 +8,11 @@ import (
 	"github.com/jfrog/gocmd/params"
 	"github.com/jfrog/jfrog-client-go/artifactory"
 	"github.com/jfrog/jfrog-client-go/artifactory/auth"
-	"github.com/jfrog/jfrog-client-go/artifactory/buildinfo"
 	"github.com/jfrog/jfrog-client-go/httpclient"
 	clientutils "github.com/jfrog/jfrog-client-go/utils"
 	"github.com/jfrog/jfrog-client-go/utils/errorutils"
 	multifilereader "github.com/jfrog/jfrog-client-go/utils/io"
 	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
-	"github.com/jfrog/jfrog-client-go/utils/io/fileutils/checksum"
 	"github.com/jfrog/jfrog-client-go/utils/log"
 	"github.com/pkg/errors"
 	"io/ioutil"
@@ -342,28 +339,12 @@ func createDependency(cachePath, dependencyName, version string) (*Package, erro
 	dep.version = version
 	dep.zipPath = zipPath
 	dep.modPath = filepath.Join(cachePath, dependencyName, "@v", version+".mod")
+	dep.infoPath = filepath.Join(cachePath, dependencyName, "@v", version+".info")
 	dep.modContent, err = ioutil.ReadFile(dep.modPath)
 	if err != nil {
 		return &dep, errorutils.CheckError(err)
 	}
 
-	// Mod file dependency for the build-info
-	modDependency := buildinfo.Dependency{Id: dep.id}
-	checksums, err := checksum.Calc(bytes.NewBuffer(dep.modContent))
-	if err != nil {
-		return &dep, err
-	}
-	modDependency.Checksum = &buildinfo.Checksum{Sha1: checksums[checksum.SHA1], Md5: checksums[checksum.MD5]}
-
-	// Zip file dependency for the build-info
-	zipDependency := buildinfo.Dependency{Id: dep.id}
-	fileDetails, err := fileutils.GetFileDetails(dep.zipPath)
-	if err != nil {
-		return &dep, err
-	}
-	zipDependency.Checksum = &buildinfo.Checksum{Sha1: fileDetails.Checksum.Sha1, Md5: fileDetails.Checksum.Md5}
-
-	dep.buildInfoDependencies = append(dep.buildInfoDependencies, modDependency, zipDependency)
 	return &dep, nil
 }
 

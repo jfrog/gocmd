@@ -1,11 +1,14 @@
 package executers
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/jfrog/gocmd/cache"
 	"github.com/jfrog/jfrog-client-go/artifactory"
 	"github.com/jfrog/jfrog-client-go/artifactory/buildinfo"
 	"github.com/jfrog/jfrog-client-go/artifactory/services/go"
+	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
+	"github.com/jfrog/jfrog-client-go/utils/io/fileutils/checksum"
 	"github.com/jfrog/jfrog-client-go/utils/log"
 )
 
@@ -23,6 +26,7 @@ type Package struct {
 	modContent            []byte
 	zipPath               string
 	modPath               string
+	infoPath              string
 	version               string
 }
 
@@ -33,6 +37,7 @@ func (dependencyPackage *Package) New(cachePath string, dep Package) GoPackage {
 	dependencyPackage.id = dep.id
 	dependencyPackage.buildInfoDependencies = dep.buildInfoDependencies
 	dependencyPackage.modPath = dep.modPath
+	dependencyPackage.infoPath = dep.infoPath
 	return dependencyPackage
 }
 
@@ -92,10 +97,42 @@ func (dependencyPackage *Package) Publish(summary string, targetRepo string, ser
 	params.TargetRepo = targetRepo
 	params.ModuleId = dependencyPackage.id
 	params.ModPath = dependencyPackage.modPath
-
+	params.InfoPath = dependencyPackage.infoPath
 	return servicesManager.PublishGoProject(params)
 }
 
 func (dependencyPackage *Package) Dependencies() []buildinfo.Dependency {
 	return dependencyPackage.buildInfoDependencies
+}
+
+// Adds the mod, zip and info files as build info dependencies
+func (dependencyPackage *Package) CreateBuildInfoDependencies(includeInfoFiles bool) error {
+	// Mod file dependency for the build-info
+	modDependency := buildinfo.Dependency{Id: dependencyPackage.id}
+	checksums, err := checksum.Calc(bytes.NewBuffer(dependencyPackage.modContent))
+	if err != nil {
+		return err
+	}
+	modDependency.Checksum = &buildinfo.Checksum{Sha1: checksums[checksum.SHA1], Md5: checksums[checksum.MD5]}
+
+	// Zip file dependency for the build-info
+	zipDependency := buildinfo.Dependency{Id: dependencyPackage.id}
+	fileDetails, err := fileutils.GetFileDetails(dependencyPackage.zipPath)
+	if err != nil {
+		return err
+	}
+	zipDependency.Checksum = &buildinfo.Checksum{Sha1: fileDetails.Checksum.Sha1, Md5: fileDetails.Checksum.Md5}
+
+	dependencyPackage.buildInfoDependencies = append(dependencyPackage.buildInfoDependencies, modDependency, zipDependency)
+	if includeInfoFiles {
+		// Info file dependency for the build-info
+		infoDependency := buildinfo.Dependency{Id: dependencyPackage.id}
+		infoFileDetails, err := fileutils.GetFileDetails(dependencyPackage.infoPath)
+		if err != nil {
+			return err
+		}
+		infoDependency.Checksum = &buildinfo.Checksum{Sha1: infoFileDetails.Checksum.Sha1, Md5: infoFileDetails.Checksum.Md5}
+		dependencyPackage.buildInfoDependencies = append(dependencyPackage.buildInfoDependencies, infoDependency)
+	}
+	return nil
 }
