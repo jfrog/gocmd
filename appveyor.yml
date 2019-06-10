@@ -1,0 +1,21 @@
+image:
+  - Visual Studio 2017
+
+build: off
+skip_tags: true
+stack: go 1.12
+clone_folder: c:\gopath\src\github.com\jfrog\gocmd
+environment:
+  GOPATH: c:\gopath
+  GO111MODULE: on
+
+  matrix:
+  - VET:
+    TEST_SUIT:
+      go vet github.com\jfrog\gocmd\tests
+  - CLIENT_TESTS:
+    TEST_SUIT:
+      go test -v github.com\jfrog\gocmd\tests --timeout 0
+
+test_script:
+  - "%TEST_SUIT%"
