@@ -3,6 +3,7 @@ package executers
 import (
 	"fmt"
 	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
+	"github.com/jfrog/jfrog-client-go/utils/log"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 )
 
 func TestGetPackageZipLocation(t *testing.T) {
+	log.SetLogger(log.NewLogger(log.DEBUG, nil))
 	baseDir, err := getBaseDir()
 	if err != nil {
 		t.Error(err)

@@ -36,6 +36,7 @@ func TestDependencyNotFoundInArtifactory(t *testing.T) {
 }
 
 func TestParseGoPathWindows(t *testing.T) {
+	log.SetLogger(log.NewLogger(log.DEBUG, nil))
 	if runtime.GOOS != "windows" {
 		log.Debug("Skipping the test since not running on Windows OS")
 		return
