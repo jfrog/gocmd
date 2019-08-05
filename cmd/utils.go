@@ -35,7 +35,7 @@ func prepareGlobalRegExp() error {
 
 	if notFoundRegExp == nil {
 		log.Debug("Initializing not found regexp")
-		notFoundRegExp, err = initRegExp(`^go: ([^\/\r\n]+\/[^\r\n\s:]*).*(404 Not Found[\s]?)$`, Error)
+		notFoundRegExp, err = initRegExp(`^go: ([^\/\r\n]+\/[^\r\n\s:]*).*( 404( Not Found)?[\s]?)$`, Error)
 		if err != nil {
 			return err
 		}
