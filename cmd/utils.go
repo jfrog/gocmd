@@ -151,9 +151,11 @@ func outputToMap(output string, errorOutput string) map[string]bool {
 
 	// Parse dependency resolution output, sent to the error output by go mod graph
 	lineOutput = strings.Split(errorOutput, "\n")
+	prefix := "go: finding"
+	index := len(prefix) + 1
 	for _, line := range lineOutput {
-		if strings.HasPrefix(line, "go: finding") {
-			lineContent := line[12:]
+		if strings.HasPrefix(line, prefix) {
+			lineContent := line[index:]
 			dependencyParts := strings.Split(lineContent, " ")
 			dependency := fmt.Sprintf("%s@%s", dependencyParts[0], dependencyParts[1])
 			mapOfDeps[dependency] = true
