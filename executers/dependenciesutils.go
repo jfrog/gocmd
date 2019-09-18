@@ -457,21 +457,25 @@ func getDependenciesGraphWithFallback(targetRepo string, auth auth.ArtifactoryDe
 	dependenciesMap := map[string]bool{}
 	modulesWithErrors := map[string]previousTries{}
 	usedProxy := true
+
 	for {
 		// Configuring each run to use Artifactory/VCS
 		err := setOrUnsetGoProxy(usedProxy, targetRepo, auth)
 		if err != nil {
 			return nil, err
 		}
+
 		usedProxy = !usedProxy
 		dependenciesMap, err = cmd.GetDependenciesGraph()
 		if err == nil {
 			break
 		}
+
 		moduleAndVersion, err := getModuleAndVersion(usedProxy, err)
 		if err != nil {
 			return nil, err
 		}
+
 		modulePreviousTries, ok := modulesWithErrors[moduleAndVersion]
 		modulePreviousTries.setTriedFrom(usedProxy)
 		if ok && modulePreviousTries.triedFromVCS && modulePreviousTries.triedFromArtifactory {
@@ -479,6 +483,7 @@ func getDependenciesGraphWithFallback(targetRepo string, auth auth.ArtifactoryDe
 		}
 		modulesWithErrors[moduleAndVersion] = modulePreviousTries
 	}
+
 	return dependenciesMap, nil
 }
 

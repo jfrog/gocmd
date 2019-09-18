@@ -16,6 +16,7 @@ import (
 var protocolRegExp *gofrogcmd.CmdOutputPattern
 var unrecognizedImportRegExp *gofrogcmd.CmdOutputPattern
 var notFoundRegExp *gofrogcmd.CmdOutputPattern
+var notFoundGo113RegExp *gofrogcmd.CmdOutputPattern
 var unknownRevisionRegExp *gofrogcmd.CmdOutputPattern
 var notFoundZipRegExp *gofrogcmd.CmdOutputPattern
 
@@ -75,7 +76,8 @@ func RunGo(goArg []string) error {
 	if err != nil {
 		return err
 	}
-	_, _, err = gofrogcmd.RunCmdWithOutputParser(goCmd, true, protocolRegExp, notFoundRegExp, unrecognizedImportRegExp, unknownRevisionRegExp, notFoundZipRegExp)
+
+	_, _, _, err = gofrogcmd.RunCmdWithOutputParser(goCmd, true, protocolRegExp, notFoundRegExp, notFoundGo113RegExp, unrecognizedImportRegExp, unknownRevisionRegExp, notFoundZipRegExp)
 	return errorutils.CheckError(err)
 }
 
@@ -124,7 +126,7 @@ func GetDependenciesGraph() (map[string]bool, error) {
 	if err != nil {
 		return nil, err
 	}
-	output, _, err := gofrogcmd.RunCmdWithOutputParser(goCmd, true, protocolRegExp, notFoundRegExp, unrecognizedImportRegExp, unknownRevisionRegExp)
+	output, _, _, err := gofrogcmd.RunCmdWithOutputParser(goCmd, true, protocolRegExp, notFoundRegExp, unrecognizedImportRegExp, unknownRevisionRegExp)
 	if len(output) != 0 {
 		log.Debug(output)
 	}
@@ -175,7 +177,7 @@ func RunGoModInit(moduleName string) error {
 	}
 
 	goCmd.Command = []string{"mod", "init", moduleName}
-	_, _, err = gofrogcmd.RunCmdWithOutputParser(goCmd, true)
+	_, _, _, err = gofrogcmd.RunCmdWithOutputParser(goCmd, true)
 	return err
 }
 
