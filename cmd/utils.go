@@ -41,6 +41,14 @@ func prepareGlobalRegExp() error {
 		}
 	}
 
+	if notFoundGo113RegExp == nil {
+		log.Debug("Initializing not found go 1.13 regexp")
+		notFoundGo113RegExp, err = initRegExp(`^^[\s]*[\s](.+)@(.+):[\s]reading[\s].*(404( Not Found)?[\s]?)$`, Error)
+		if err != nil {
+			return err
+		}
+	}
+
 	if unrecognizedImportRegExp == nil {
 		log.Debug("Initializing unrecognized import path regexp")
 		unrecognizedImportRegExp, err = initRegExp(`[^go:]([^\/\r\n]+\/[^\r\n\s:]*).*(unrecognized import path)`, Error)

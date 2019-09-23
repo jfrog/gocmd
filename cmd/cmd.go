@@ -13,10 +13,25 @@ import (
 	"path/filepath"
 )
 
+// Used for masking basic auth credentials as part of a URL.
 var protocolRegExp *gofrogcmd.CmdOutputPattern
+
+// Used for identifying an "unrecognized import" log line when executing the go client.
 var unrecognizedImportRegExp *gofrogcmd.CmdOutputPattern
+
+// Used for identifying an "404 not found" log line when executing the go client.
+// Compatible with the log message format before go 1.13.
 var notFoundRegExp *gofrogcmd.CmdOutputPattern
+
+// Used for identifying an "404 not found" log line when executing the go client.
+// Compatible with the log message format starting from go 1.13.
+var notFoundGo113RegExp *gofrogcmd.CmdOutputPattern
+
+// Used for identifying an "unknown revision" log line when executing the go client.
 var unknownRevisionRegExp *gofrogcmd.CmdOutputPattern
+
+// Used for identifying a case where the zip is not found in the repository,
+// using the go client log output,
 var notFoundZipRegExp *gofrogcmd.CmdOutputPattern
 
 func NewCmd() (*Cmd, error) {
@@ -75,7 +90,8 @@ func RunGo(goArg []string) error {
 	if err != nil {
 		return err
 	}
-	_, _, err = gofrogcmd.RunCmdWithOutputParser(goCmd, true, protocolRegExp, notFoundRegExp, unrecognizedImportRegExp, unknownRevisionRegExp, notFoundZipRegExp)
+
+	_, _, _, err = gofrogcmd.RunCmdWithOutputParser(goCmd, true, protocolRegExp, notFoundRegExp, notFoundGo113RegExp, unrecognizedImportRegExp, unknownRevisionRegExp, notFoundZipRegExp)
 	return errorutils.CheckError(err)
 }
 
@@ -124,7 +140,7 @@ func GetDependenciesGraph() (map[string]bool, error) {
 	if err != nil {
 		return nil, err
 	}
-	output, _, err := gofrogcmd.RunCmdWithOutputParser(goCmd, true, protocolRegExp, notFoundRegExp, unrecognizedImportRegExp, unknownRevisionRegExp)
+	output, _, _, err := gofrogcmd.RunCmdWithOutputParser(goCmd, true, protocolRegExp, notFoundRegExp, unrecognizedImportRegExp, unknownRevisionRegExp)
 	if len(output) != 0 {
 		log.Debug(output)
 	}
@@ -175,7 +191,7 @@ func RunGoModInit(moduleName string) error {
 	}
 
 	goCmd.Command = []string{"mod", "init", moduleName}
-	_, _, err = gofrogcmd.RunCmdWithOutputParser(goCmd, true)
+	_, _, _, err = gofrogcmd.RunCmdWithOutputParser(goCmd, true)
 	return err
 }
 
