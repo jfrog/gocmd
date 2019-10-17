@@ -104,23 +104,11 @@ func Error(pattern *gofrogio.CmdOutputPattern) (string, error) {
 	return "", errors.New(fmt.Sprintf("Regex found the following values: %s", pattern.MatchedResults))
 }
 
-func GetSumContentAndRemove(rootProjectDir string) (sumFileContent []byte, sumFileStat os.FileInfo, err error) {
+func GetGoSum(rootProjectDir string) (sumFileContent []byte, sumFileStat os.FileInfo, err error) {
 	sumFileExists, err := fileutils.IsFileExists(filepath.Join(rootProjectDir, "go.sum"), false)
-	if err != nil {
-		return
-	}
-	if sumFileExists {
+	if err == nil && sumFileExists {
 		log.Debug("Sum file exists:", rootProjectDir)
 		sumFileContent, sumFileStat, err = GetFileDetails(filepath.Join(rootProjectDir, "go.sum"))
-		if err != nil {
-			return
-		}
-		log.Debug("Removing file:", filepath.Join(rootProjectDir, "go.sum"))
-		err = os.Remove(filepath.Join(rootProjectDir, "go.sum"))
-		if err != nil {
-			return
-		}
-		return
 	}
 	return
 }

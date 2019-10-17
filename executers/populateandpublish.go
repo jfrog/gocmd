@@ -281,7 +281,7 @@ func (pwd *PackageWithDeps) getModPathInTemp(tempDir string) string {
 func (pwd *PackageWithDeps) publishDependencyAndPopulateTransitive(pathToModFile, targetRepo string, graphDependencies map[string]bool, cache *cache.DependenciesCache, serviceManager *artifactory.ArtifactoryServicesManager) error {
 	// If the mod is not empty, populate transitive dependencies
 	if len(graphDependencies) > 0 {
-		sumFileContent, sumFileStat, err := cmd.GetSumContentAndRemove(filepath.Dir(pathToModFile))
+		sumFileContent, sumFileStat, err := cmd.GetGoSum(filepath.Dir(pathToModFile))
 		utils.LogError(err)
 		pwd.setTransitiveDependencies(targetRepo, graphDependencies, cache, serviceManager.GetConfig().GetArtDetails())
 		if len(sumFileContent) > 0 && sumFileStat != nil {

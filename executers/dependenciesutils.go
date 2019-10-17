@@ -126,7 +126,7 @@ func collectProjectDependencies(targetRepo, rootProjectDir string, cache *cache.
 
 	// Merge replaceDependencies with dependenciesToPublish
 	mergeReplaceDependenciesWithGraphDependencies(replaceDependencies, dependenciesMap)
-	sumFileContent, sumFileStat, err := cmd.GetSumContentAndRemove(rootProjectDir)
+	sumFileContent, sumFileStat, err := cmd.GetGoSum(rootProjectDir)
 	if err != nil {
 		return nil, err
 	}
