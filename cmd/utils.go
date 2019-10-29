@@ -43,7 +43,7 @@ func prepareGlobalRegExp() error {
 
 	if notFoundGo113RegExp == nil {
 		log.Debug("Initializing not found go 1.13 regexp")
-		notFoundGo113RegExp, err = initRegExp(`^^[\s]*[\s](.+)@(.+):[\s]reading[\s].*(404( Not Found)?[\s]?)$`, Error)
+		notFoundGo113RegExp, err = initRegExp(`^[\s]*[\s](.+)@(.+):[\s]reading[\s].*(404( Not Found)?[\s]?)$`, Error)
 		if err != nil {
 			return err
 		}
@@ -104,23 +104,11 @@ func Error(pattern *gofrogio.CmdOutputPattern) (string, error) {
 	return "", errors.New(fmt.Sprintf("Regex found the following values: %s", pattern.MatchedResults))
 }
 
-func GetSumContentAndRemove(rootProjectDir string) (sumFileContent []byte, sumFileStat os.FileInfo, err error) {
+func GetGoSum(rootProjectDir string) (sumFileContent []byte, sumFileStat os.FileInfo, err error) {
 	sumFileExists, err := fileutils.IsFileExists(filepath.Join(rootProjectDir, "go.sum"), false)
-	if err != nil {
-		return
-	}
-	if sumFileExists {
+	if err == nil && sumFileExists {
 		log.Debug("Sum file exists:", rootProjectDir)
 		sumFileContent, sumFileStat, err = GetFileDetails(filepath.Join(rootProjectDir, "go.sum"))
-		if err != nil {
-			return
-		}
-		log.Debug("Removing file:", filepath.Join(rootProjectDir, "go.sum"))
-		err = os.Remove(filepath.Join(rootProjectDir, "go.sum"))
-		if err != nil {
-			return
-		}
-		return
 	}
 	return
 }

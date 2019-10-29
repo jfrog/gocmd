@@ -124,7 +124,7 @@ func GetDependenciesGraph() (map[string]bool, error) {
 	if err != nil {
 		return nil, err
 	}
-	sumFileContent, sumFileStat, err := GetSumContentAndRemove(projectDir)
+	sumFileContent, sumFileStat, err := GetGoSum(projectDir)
 	if len(sumFileContent) > 0 && sumFileStat != nil {
 		defer RestoreSumFile(projectDir, sumFileContent, sumFileStat)
 	}
