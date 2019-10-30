@@ -148,28 +148,70 @@ func TestMergeReplaceDependenciesWithGraphDependencies(t *testing.T) {
 		expectedMap       map[string]bool
 	}{
 		{"missingInGraphMap",
-			[]string{"replace github.com/jfrog/jfrog-client-go => github.com/jfrog/jfrog-client-go v0.1.0"},
-			map[string]bool{},
-			map[string]bool{"github.com/jfrog/jfrog-client-go@v0.1.0": true}},
+			[]string{
+				"replace github.com/jfrog/jfrog-client-go => github.com/jfrog/jfrog-client-go v0.1.0",
+			},
+			map[string]bool{"github.com/jfrog/jfrog-cli-go@v1.21.0": true},
+			map[string]bool{"github.com/jfrog/jfrog-cli-go@v1.21.0": true}},
 		{"existsInGraphMap",
 			[]string{"replace github.com/jfrog/jfrog-client-go => github.com/jfrog/jfrog-client-go v0.1.0"},
-			map[string]bool{"github.com/jfrog/jfrog-client-go@v0.1.0": true},
-			map[string]bool{"github.com/jfrog/jfrog-client-go@v0.1.0": true}},
-		{"addToGraphMap",
-			[]string{"replace github.com/jfrog/jfrog-client-go => github.com/jfrog/jfrog-client-go v0.1.0"},
-			map[string]bool{"github.com/jfrog/jfrog-cli-go@v1.21.0": true},
-			map[string]bool{
-				"github.com/jfrog/jfrog-cli-go@v1.21.0":   true,
-				"github.com/jfrog/jfrog-client-go@v0.1.0": true}},
-		{"addToGraphMapFromReplaceBlock",
-			[]string{"github.com/jfrog/jfrog-client-go => github.com/jfrog/jfrog-client-go v2.1.2"},
 			map[string]bool{
 				"github.com/jfrog/jfrog-cli-go@v1.21.0":   true,
 				"github.com/jfrog/jfrog-client-go@v0.1.0": true},
 			map[string]bool{
 				"github.com/jfrog/jfrog-cli-go@v1.21.0":   true,
+				"github.com/jfrog/jfrog-client-go@v0.1.0": true}},
+		{"replaceInGraphMapOneMatch",
+			[]string{"github.com/jfrog/jfrog-client-go => github.com/jfrog/jfrog-client-go v0.2.0"},
+			map[string]bool{
+				"github.com/jfrog/jfrog-cli-go@v1.21.0":   true,
+				"github.com/jfrog/jfrog-client-go@v0.1.0": true},
+			map[string]bool{
+				"github.com/jfrog/jfrog-cli-go@v1.21.0":   true,
+				"github.com/jfrog/jfrog-client-go@v0.2.0": true}},
+		{"replaceInGraphMapOneMatchExactVersion",
+			[]string{"replace github.com/jfrog/jfrog-client-go v0.1.1 => github.com/jfrog/jfrog-client-go v0.2.0"},
+			map[string]bool{
 				"github.com/jfrog/jfrog-client-go@v0.1.0": true,
-				"github.com/jfrog/jfrog-client-go@v2.1.2": true}},
+				"github.com/jfrog/jfrog-client-go@v0.1.1": true},
+			map[string]bool{
+				"github.com/jfrog/jfrog-client-go@v0.1.0": true,
+				"github.com/jfrog/jfrog-client-go@v0.2.0": true}},
+		{"replaceInGraphMapMultipleMatch",
+			[]string{"replace github.com/jfrog/jfrog-client-go => github.com/jfrog/jfrog-client-go v0.2.0"},
+			map[string]bool{
+				"github.com/jfrog/jfrog-cli-go@v1.21.0":   true,
+				"github.com/jfrog/jfrog-client-go@v0.1.0": true,
+				"github.com/jfrog/jfrog-client-go@v0.1.1": true},
+			map[string]bool{
+				"github.com/jfrog/jfrog-cli-go@v1.21.0":   true,
+				"github.com/jfrog/jfrog-client-go@v0.2.0": true}},
+		{"missingInGraphMapLocalReplace",
+			[]string{
+				"replace github.com/jfrog/jfrog-client-go => ../jfrog-client-go",
+			},
+			map[string]bool{"github.com/jfrog/jfrog-cli-go@v1.21.0": true},
+			map[string]bool{"github.com/jfrog/jfrog-cli-go@v1.21.0": true}},
+		{"existsInGraphMapOneMatchLocalReplace",
+			[]string{"replace github.com/jfrog/jfrog-client-go => ../jfrog-client-go"},
+			map[string]bool{
+				"github.com/jfrog/jfrog-cli-go@v1.21.0":   true,
+				"github.com/jfrog/jfrog-client-go@v0.1.0": true},
+			map[string]bool{"github.com/jfrog/jfrog-cli-go@v1.21.0": true}},
+		{"replaceInGraphMapOneMatchExactVersionLocalReplace",
+			[]string{"replace github.com/jfrog/jfrog-client-go v0.1.1 => ../jfrog-client-go"},
+			map[string]bool{
+				"github.com/jfrog/jfrog-client-go@v0.1.0": true,
+				"github.com/jfrog/jfrog-client-go@v0.1.1": true},
+			map[string]bool{"github.com/jfrog/jfrog-client-go@v0.1.0": true}},
+		{"replaceInGraphMapMultipleMatchLocalReplace",
+			[]string{"replace github.com/jfrog/jfrog-client-go => ../jfrog-client-go"},
+			map[string]bool{
+				"github.com/jfrog/jfrog-cli-go@v1.21.0":   true,
+				"github.com/jfrog/jfrog-client-go@v0.1.0": true,
+				"github.com/jfrog/jfrog-client-go@v0.1.1": true},
+			map[string]bool{
+				"github.com/jfrog/jfrog-cli-go@v1.21.0": true}},
 	}
 
 	for _, test := range tests {
