@@ -2,13 +2,14 @@ package executers
 
 import (
 	"fmt"
-	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
-	"github.com/jfrog/jfrog-client-go/utils/log"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
+	"github.com/jfrog/jfrog-client-go/utils/log"
 )
 
 func TestGetPackageZipLocation(t *testing.T) {
@@ -146,14 +147,71 @@ func TestMergeReplaceDependenciesWithGraphDependencies(t *testing.T) {
 		graphDependencies map[string]bool
 		expectedMap       map[string]bool
 	}{
-		{"missingInGraphMap", []string{"replace github.com/jfrog/jfrog-client-go => github.com/jfrog/jfrog-client-go v0.1.0", "replace github.com/jfrog/jfrog-client-go => github.com/jfrog/jfrog-cli-go", "replace github.com/jfrog/jfrog-client-go => /path/to/mod/file"}, map[string]bool{},
+		{"missingInGraphMap",
+			[]string{
+				"replace github.com/jfrog/jfrog-client-go => github.com/jfrog/jfrog-client-go v0.1.0",
+			},
+			map[string]bool{"github.com/jfrog/jfrog-cli-go@v1.21.0": true},
+			map[string]bool{"github.com/jfrog/jfrog-cli-go@v1.21.0": true}},
+		{"existsInGraphMap",
+			[]string{"replace github.com/jfrog/jfrog-client-go => github.com/jfrog/jfrog-client-go v0.1.0"},
+			map[string]bool{
+				"github.com/jfrog/jfrog-cli-go@v1.21.0":   true,
+				"github.com/jfrog/jfrog-client-go@v0.1.0": true},
+			map[string]bool{
+				"github.com/jfrog/jfrog-cli-go@v1.21.0":   true,
+				"github.com/jfrog/jfrog-client-go@v0.1.0": true}},
+		{"replaceInGraphMapOneMatch",
+			[]string{"github.com/jfrog/jfrog-client-go => github.com/jfrog/jfrog-client-go v0.2.0"},
+			map[string]bool{
+				"github.com/jfrog/jfrog-cli-go@v1.21.0":   true,
+				"github.com/jfrog/jfrog-client-go@v0.1.0": true},
+			map[string]bool{
+				"github.com/jfrog/jfrog-cli-go@v1.21.0":   true,
+				"github.com/jfrog/jfrog-client-go@v0.2.0": true}},
+		{"replaceInGraphMapOneMatchExactVersion",
+			[]string{"replace github.com/jfrog/jfrog-client-go v0.1.1 => github.com/jfrog/jfrog-client-go v0.2.0"},
+			map[string]bool{
+				"github.com/jfrog/jfrog-client-go@v0.1.0": true,
+				"github.com/jfrog/jfrog-client-go@v0.1.1": true},
+			map[string]bool{
+				"github.com/jfrog/jfrog-client-go@v0.1.0": true,
+				"github.com/jfrog/jfrog-client-go@v0.2.0": true}},
+		{"replaceInGraphMapMultipleMatch",
+			[]string{"replace github.com/jfrog/jfrog-client-go => github.com/jfrog/jfrog-client-go v0.2.0"},
+			map[string]bool{
+				"github.com/jfrog/jfrog-cli-go@v1.21.0":   true,
+				"github.com/jfrog/jfrog-client-go@v0.1.0": true,
+				"github.com/jfrog/jfrog-client-go@v0.1.1": true},
+			map[string]bool{
+				"github.com/jfrog/jfrog-cli-go@v1.21.0":   true,
+				"github.com/jfrog/jfrog-client-go@v0.2.0": true}},
+		{"missingInGraphMapLocalReplace",
+			[]string{
+				"replace github.com/jfrog/jfrog-client-go => ../jfrog-client-go",
+			},
+			map[string]bool{"github.com/jfrog/jfrog-cli-go@v1.21.0": true},
+			map[string]bool{"github.com/jfrog/jfrog-cli-go@v1.21.0": true}},
+		{"existsInGraphMapOneMatchLocalReplace",
+			[]string{"replace github.com/jfrog/jfrog-client-go => ../jfrog-client-go"},
+			map[string]bool{
+				"github.com/jfrog/jfrog-cli-go@v1.21.0":   true,
+				"github.com/jfrog/jfrog-client-go@v0.1.0": true},
+			map[string]bool{"github.com/jfrog/jfrog-cli-go@v1.21.0": true}},
+		{"replaceInGraphMapOneMatchExactVersionLocalReplace",
+			[]string{"replace github.com/jfrog/jfrog-client-go v0.1.1 => ../jfrog-client-go"},
+			map[string]bool{
+				"github.com/jfrog/jfrog-client-go@v0.1.0": true,
+				"github.com/jfrog/jfrog-client-go@v0.1.1": true},
 			map[string]bool{"github.com/jfrog/jfrog-client-go@v0.1.0": true}},
-		{"existsInGraphMap", []string{"replace github.com/jfrog/jfrog-client-go => github.com/jfrog/jfrog-client-go v0.1.0", "replace github.com/jfrog/jfrog-client-go => github.com/jfrog/jfrog-cli-go", "replace github.com/jfrog/jfrog-client-go => /path/to/mod/file"}, map[string]bool{"github.com/jfrog/jfrog-client-go@v0.1.0": true},
-			map[string]bool{"github.com/jfrog/jfrog-client-go@v0.1.0": true}},
-		{"addToGraphMap", []string{"replace github.com/jfrog/jfrog-client-go => github.com/jfrog/jfrog-client-go v0.1.0", "replace github.com/jfrog/jfrog-client-go => github.com/jfrog/jfrog-cli-go", "replace github.com/jfrog/jfrog-client-go => /path/to/mod/file"}, map[string]bool{"github.com/jfrog/jfrog-cli-go@v1.21.0": true},
-			map[string]bool{"github.com/jfrog/jfrog-cli-go@v1.21.0": true, "github.com/jfrog/jfrog-client-go@v0.1.0": true}},
-		{"addToGraphMapFromReplaceBlock", []string{"replace github.com/jfrog/jfrog-client-go => github.com/jfrog/jfrog-client-go v0.1.0", "replace github.com/jfrog/jfrog-client-go => github.com/jfrog/jfrog-cli-go", "replace github.com/jfrog/jfrog-client-go => /path/to/mod/file", "github.com/jfrog/jfrog-client-go => github.com/jfrog/jfrog-client-go v2.1.2"}, map[string]bool{"github.com/jfrog/jfrog-cli-go@v1.21.0": true},
-			map[string]bool{"github.com/jfrog/jfrog-cli-go@v1.21.0": true, "github.com/jfrog/jfrog-client-go@v0.1.0": true, "github.com/jfrog/jfrog-client-go@v2.1.2": true}},
+		{"replaceInGraphMapMultipleMatchLocalReplace",
+			[]string{"replace github.com/jfrog/jfrog-client-go => ../jfrog-client-go"},
+			map[string]bool{
+				"github.com/jfrog/jfrog-cli-go@v1.21.0":   true,
+				"github.com/jfrog/jfrog-client-go@v0.1.0": true,
+				"github.com/jfrog/jfrog-client-go@v0.1.1": true},
+			map[string]bool{
+				"github.com/jfrog/jfrog-cli-go@v1.21.0": true}},
 	}
 
 	for _, test := range tests {
@@ -177,17 +235,37 @@ func TestParseModForReplaceDependencies(t *testing.T) {
 		name                        string
 		expectedReplaceDependencies []string
 	}{
-		{"replaceBlockFirst", []string{"        github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible", "        github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1"}},
+		{"replaceBlockFirst",
+			[]string{
+				"        github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible",
+				"        github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1"}},
 		{
-			"replaceBlockLast", []string{"        github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible", "        github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1"}},
+			"replaceBlockLast", []string{
+				"        github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible",
+				"        github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1"}},
 		{
-			"replaceLineFirst", []string{"replace github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible", "replace github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1"}},
+			"replaceLineFirst",
+			[]string{
+				"replace github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible",
+				"replace github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1"}},
 		{
-			"replaceLineLast", []string{"replace github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible", "replace github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1"}},
+			"replaceLineLast",
+			[]string{
+				"replace github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible",
+				"replace github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1"}},
 		{
-			"replaceBothLineFirst", []string{"replace github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible", "replace github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1", "        github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible", "        github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1"}},
+			"replaceBothLineFirst",
+			[]string{
+				"replace github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible",
+				"replace github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1",
+				"        github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible",
+				"        github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1"}},
 		{
-			"replaceBothBlockFirst", []string{"replace github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible", "replace github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1", "        github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible", "        github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1"}},
+			"replaceBothBlockFirst", []string{
+				"replace github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible",
+				"replace github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1",
+				"        github.com/Masterminds/sprig => github.com/Masterminds/sprig v2.13.0+incompatible",
+				"        github.com/Microsoft/ApplicationInsights-Go => github.com/Microsoft/ApplicationInsights-Go v0.3.1"}},
 	}
 
 	for _, test := range tests {

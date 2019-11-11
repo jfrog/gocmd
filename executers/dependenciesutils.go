@@ -2,6 +2,14 @@ package executers
 
 import (
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"os"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"unicode"
+
 	"github.com/jfrog/gocmd/cache"
 	"github.com/jfrog/gocmd/cmd"
 	"github.com/jfrog/gocmd/executers/utils"
@@ -15,13 +23,6 @@ import (
 	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
 	"github.com/jfrog/jfrog-client-go/utils/log"
 	"github.com/pkg/errors"
-	"io/ioutil"
-	"net/http"
-	"os"
-	"path/filepath"
-	"reflect"
-	"strings"
-	"unicode"
 )
 
 const (
@@ -396,19 +397,52 @@ func mergeReplaceDependenciesWithGraphDependencies(replaceDeps []string, graphDe
 			log.Debug("The following replace line includes less then two elements", replaceDeps)
 			continue
 		}
+		// Strip "replace" keyword if present and split module to replace to find name and version which is optional
+		moduleToReplaceInfo := strings.Split(strings.TrimSpace(strings.Replace(replaceDeps[0], "replace ", "", 1)), " ")
+		moduleNameToReplace := strings.TrimSpace(moduleToReplaceInfo[0])
+		var moduleVersionToReplace string
+		if len(moduleToReplaceInfo) > 1 {
+			moduleVersionToReplace = strings.TrimSpace(moduleToReplaceInfo[1])
+		}
+
 		replacesInfo := strings.TrimSpace(replaceDeps[1])
 		newDependency := strings.Split(replacesInfo, " ")
 		if len(newDependency) != 2 {
 			log.Debug("The replacer is not pointing to a VCS version", newDependency[0])
+			// For local replacement, only removal from the map is required as no extra deps need to be added for download
+			removeFromDepsGraph(graphDeps, moduleNameToReplace, moduleVersionToReplace)
 			continue
 		}
-		// Check if the dependency in the map, if not add to the map
-		_, exists := graphDeps[newDependency[0]+"@"+newDependency[1]]
-		if !exists {
-			log.Debug("Adding dependency", newDependency[0], newDependency[1])
+
+		// Remove the dependencies from graph matching module to replace to avoid downloading deps which will never
+		// be used as they are replaced
+		removedCount := removeFromDepsGraph(graphDeps, moduleNameToReplace, moduleVersionToReplace)
+		// Only add the replacement dependency to the map if it is replacing at least one dependency
+		if removedCount > 0 {
 			graphDeps[newDependency[0]+"@"+newDependency[1]] = true
 		}
 	}
+}
+
+func removeFromDepsGraph(graphDeps map[string]bool, name, version string) (removedCount int) {
+	dependencyToRemove := name + "@" + version
+	log.Debug("Dependency to remove", dependencyToRemove)
+	if version != "" {
+		// If version is specifed, remove the exact match, i.e the module with a specific version
+		if _, exists := graphDeps[dependencyToRemove]; exists {
+			delete(graphDeps, dependencyToRemove)
+			removedCount++
+		}
+	} else {
+		// Otherwise remove any dependencies matching the module name, i.e any versions of the module
+		for k := range graphDeps {
+			if strings.HasPrefix(k, dependencyToRemove) {
+				delete(graphDeps, k)
+				removedCount++
+			}
+		}
+	}
+	return removedCount
 }
 
 func getReplaceDependencies() ([]string, error) {
