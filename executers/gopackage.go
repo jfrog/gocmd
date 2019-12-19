@@ -1,14 +1,13 @@
 package executers
 
 import (
-	"bytes"
 	"fmt"
+
 	"github.com/jfrog/gocmd/cache"
 	"github.com/jfrog/jfrog-client-go/artifactory"
 	"github.com/jfrog/jfrog-client-go/artifactory/buildinfo"
-	"github.com/jfrog/jfrog-client-go/artifactory/services/go"
+	_go "github.com/jfrog/jfrog-client-go/artifactory/services/go"
 	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
-	"github.com/jfrog/jfrog-client-go/utils/io/fileutils/checksum"
 	"github.com/jfrog/jfrog-client-go/utils/log"
 )
 
@@ -107,32 +106,14 @@ func (dependencyPackage *Package) Dependencies() []buildinfo.Dependency {
 
 // Adds the mod, zip and info files as build info dependencies
 func (dependencyPackage *Package) CreateBuildInfoDependencies(includeInfoFiles bool) error {
-	// Mod file dependency for the build-info
-	modDependency := buildinfo.Dependency{Id: dependencyPackage.id}
-	checksums, err := checksum.Calc(bytes.NewBuffer(dependencyPackage.modContent))
-	if err != nil {
-		return err
-	}
-	modDependency.Checksum = &buildinfo.Checksum{Sha1: checksums[checksum.SHA1], Md5: checksums[checksum.MD5]}
-
 	// Zip file dependency for the build-info
 	zipDependency := buildinfo.Dependency{Id: dependencyPackage.id}
 	fileDetails, err := fileutils.GetFileDetails(dependencyPackage.zipPath)
 	if err != nil {
 		return err
 	}
+	zipDependency.Type = "zip"
 	zipDependency.Checksum = &buildinfo.Checksum{Sha1: fileDetails.Checksum.Sha1, Md5: fileDetails.Checksum.Md5}
-
-	dependencyPackage.buildInfoDependencies = append(dependencyPackage.buildInfoDependencies, modDependency, zipDependency)
-	if includeInfoFiles {
-		// Info file dependency for the build-info
-		infoDependency := buildinfo.Dependency{Id: dependencyPackage.id}
-		infoFileDetails, err := fileutils.GetFileDetails(dependencyPackage.infoPath)
-		if err != nil {
-			return err
-		}
-		infoDependency.Checksum = &buildinfo.Checksum{Sha1: infoFileDetails.Checksum.Sha1, Md5: infoFileDetails.Checksum.Md5}
-		dependencyPackage.buildInfoDependencies = append(dependencyPackage.buildInfoDependencies, infoDependency)
-	}
+	dependencyPackage.buildInfoDependencies = append(dependencyPackage.buildInfoDependencies, zipDependency)
 	return nil
 }
