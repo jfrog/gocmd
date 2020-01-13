@@ -37,7 +37,7 @@ var notFoundZipRegExp *gofrogcmd.CmdOutputPattern
 func NewCmd() (*Cmd, error) {
 	execPath, err := exec.LookPath("go")
 	if err != nil {
-		return nil, errorutils.CheckError(err)
+		return nil, errorutils.WrapError(err)
 	}
 	return &Cmd{Go: execPath}, nil
 }
@@ -77,7 +77,7 @@ func GetGoVersion() (string, error) {
 	}
 	goCmd.Command = []string{"version"}
 	output, err := gofrogcmd.RunCmdOutput(goCmd)
-	return output, errorutils.CheckError(err)
+	return output, errorutils.WrapError(err)
 }
 
 func RunGo(goArg []string) error {
@@ -92,7 +92,7 @@ func RunGo(goArg []string) error {
 	}
 
 	_, _, _, err = gofrogcmd.RunCmdWithOutputParser(goCmd, true, protocolRegExp, notFoundRegExp, notFoundGo113RegExp, unrecognizedImportRegExp, unknownRevisionRegExp, notFoundZipRegExp)
-	return errorutils.CheckError(err)
+	return errorutils.WrapError(err)
 }
 
 // Using go mod download {dependency} command to download the dependency
@@ -103,7 +103,7 @@ func DownloadDependency(dependencyName string) error {
 	}
 	log.Debug("Running go mod download -json", dependencyName)
 	goCmd.Command = []string{"mod", "download", "-json", dependencyName}
-	return errorutils.CheckError(gofrogcmd.RunCmd(goCmd))
+	return errorutils.WrapError(gofrogcmd.RunCmd(goCmd))
 }
 
 // Runs go mod graph command and returns slice of the dependencies
@@ -147,7 +147,7 @@ func GetDependenciesGraph() (map[string]bool, error) {
 
 	if err != nil {
 		// If the command fails, the mod stays the same, therefore, don't need to be restored.
-		return nil, errorutils.CheckError(err)
+		return nil, errorutils.WrapError(err)
 	}
 
 	// Restore the the go.mod and go.sum files, to make sure they stay the same as before
@@ -157,7 +157,7 @@ func GetDependenciesGraph() (map[string]bool, error) {
 		return nil, err
 	}
 
-	return outputToMap(output), errorutils.CheckError(err)
+	return outputToMap(output), errorutils.WrapError(err)
 }
 
 // Using go mod download command to download all the dependencies before publishing to Artifactory
@@ -202,7 +202,7 @@ func GetProjectRoot() (string, error) {
 	// Get the current directory.
 	wd, err := os.Getwd()
 	if err != nil {
-		return wd, errorutils.CheckError(err)
+		return wd, errorutils.WrapError(err)
 	}
 	defer os.Chdir(wd)
 
@@ -238,9 +238,9 @@ func GetProjectRoot() (string, error) {
 
 		// If we already visited this directory, it means that there's a loop and we can stop.
 		if visitedPaths[wd] {
-			return "", errorutils.CheckError(errors.New("Could not find go.mod for project."))
+			return "", errorutils.WrapError(errors.New("Could not find go.mod for project."))
 		}
 	}
 
-	return "", errorutils.CheckError(errors.New("Could not find go.mod for project."))
+	return "", errorutils.WrapError(errors.New("Could not find go.mod for project."))
 }

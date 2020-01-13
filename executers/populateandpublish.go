@@ -92,7 +92,7 @@ func (pwd *PackageWithDeps) updateModContent(path string, cache *cache.Dependenc
 		modContent, err := ioutil.ReadFile(path)
 		if err != nil {
 			cache.IncrementFailures()
-			return errorutils.CheckError(err)
+			return errorutils.WrapError(err)
 		}
 		pwd.Dependency.SetModContent(modContent)
 	}
@@ -221,8 +221,8 @@ func (pwd *PackageWithDeps) useCachedMod(path string) error {
 	err := writeModContentToModFile(path, pwd.Dependency.GetModContent())
 	utils.LogError(err)
 	err = os.Chdir(filepath.Dir(path))
-	if errorutils.CheckError(err) != nil {
-		return err
+	if err != nil {
+		return errorutils.WrapError(err)
 	}
 	utils.LogError(removeGoSum(path))
 	return nil
@@ -245,8 +245,8 @@ func (pwd *PackageWithDeps) getModPathAndUnzipDependency(path string) (string, e
 func (pwd *PackageWithDeps) prepareAndRunInit(pathToModFile string) error {
 	log.Debug("Preparing to init", pathToModFile)
 	err := os.Chdir(filepath.Dir(pathToModFile))
-	if errorutils.CheckError(err) != nil {
-		return err
+	if err != nil {
+		return errorutils.WrapError(err)
 	}
 	exists, err := fileutils.IsFileExists(pathToModFile, false)
 	utils.LogError(err)
@@ -309,7 +309,7 @@ func (pwd *PackageWithDeps) publishDependencyAndPopulateTransitive(pathToModFile
 
 	// Remove from temp folder the dependency.
 	err := os.RemoveAll(filepath.Dir(pathToModFile))
-	if errorutils.CheckError(err) != nil {
+	if err != nil {
 		log.Error(fmt.Sprintf("Removing the following directory %s has encountred an error: %s", err, filepath.Dir(pathToModFile)))
 	}
 
@@ -382,7 +382,7 @@ func (pwd *PackageWithDeps) writeModContentToGoCache() error {
 	pathToModule := strings.Split(moduleAndVersion[0], "/")
 	path := filepath.Join(pwd.cachePath, strings.Join(pathToModule, fileutils.GetFileSeparator()), "@v", moduleAndVersion[1]+".mod")
 	err := ioutil.WriteFile(path, pwd.Dependency.GetModContent(), 0700)
-	return errorutils.CheckError(err)
+	return errorutils.WrapError(err)
 }
 
 // Runs over the transitive dependencies, populate the mod files of those transitive dependencies

@@ -40,10 +40,10 @@ func RunWithFallback(goArg []string, url string) error {
 func setGoProxyWithoutApi(details auth.ArtifactoryDetails) error {
 	rtUrl, err := url.Parse(details.GetUrl())
 	if err != nil {
-		return errorutils.CheckError(err)
+		return errorutils.WrapError(err)
 	}
 	err = os.Setenv(utils.GOPROXY, rtUrl.String())
-	return errorutils.CheckError(err)
+	return errorutils.WrapError(err)
 }
 
 func createGoCentralServiceManager(url string) (*artifactory.ArtifactoryServicesManager, error) {

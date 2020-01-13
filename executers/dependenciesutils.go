@@ -22,7 +22,6 @@ import (
 	multifilereader "github.com/jfrog/jfrog-client-go/utils/io"
 	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
 	"github.com/jfrog/jfrog-client-go/utils/log"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -94,7 +93,7 @@ func findMissingDepedencies(cache *cache.DependenciesCache, dependenciesToPublis
 		} else if resp.StatusCode == 404 {
 			dependencyExists = false
 		} else {
-			return errorutils.CheckError(fmt.Errorf("Artifactory response for %s:%d", module, resp.StatusCode))
+			return errorutils.NewError(fmt.Sprintf("Artifactory response for %s:%d", module, resp.StatusCode))
 		}
 		cacheDependenciesMap[goModEncode(nameAndVersion[0])+":"+goModEncode(nameAndVersion[1])] = dependencyExists
 	}
@@ -186,11 +185,11 @@ func performHeadRequest(auth auth.ArtifactoryDetails, client *httpclient.HttpCli
 func createDependencyInTemp(zipPath, tempDir string) (err error) {
 	multiReader, err := multifilereader.NewMultiFileReaderAt([]string{zipPath})
 	if err != nil {
-		return errorutils.CheckError(err)
+		return errorutils.WrapError(err)
 	}
 	err = fileutils.Unzip(multiReader, multiReader.Size(), tempDir)
 	if err != nil {
-		return errorutils.CheckError(err)
+		return errorutils.WrapError(err)
 	}
 	return nil
 }
@@ -239,7 +238,7 @@ func downloadDependency(downloadFromArtifactory bool, fullDependencyName, target
 		log.Debug("Downloading dependency from VCS:", fullDependencyName)
 		err = os.Unsetenv(utils.GOPROXY)
 	}
-	if errorutils.CheckError(err) != nil {
+	if errorutils.WrapError(err) != nil {
 		return err
 	}
 
@@ -343,7 +342,7 @@ func createDependency(cachePath, dependencyName, version string) (*Package, erro
 	dep.infoPath = filepath.Join(cachePath, dependencyName, "@v", version+".info")
 	dep.modContent, err = ioutil.ReadFile(dep.modPath)
 	if err != nil {
-		return &dep, errorutils.CheckError(err)
+		return &dep, errorutils.WrapError(err)
 	}
 
 	return &dep, nil
@@ -513,7 +512,7 @@ func getDependenciesGraphWithFallback(targetRepo string, auth auth.ArtifactoryDe
 		modulePreviousTries, ok := modulesWithErrors[moduleAndVersion]
 		modulePreviousTries.setTriedFrom(usedProxy)
 		if ok && modulePreviousTries.triedFromVCS && modulePreviousTries.triedFromArtifactory {
-			return nil, errorutils.CheckError(errors.New(fmt.Sprintf(FailedToRetrieve+" %s "+FromBothArtifactoryAndVcs, moduleAndVersion)))
+			return nil, errorutils.NewError(fmt.Sprintf(FailedToRetrieve+" %s "+FromBothArtifactoryAndVcs, moduleAndVersion))
 		}
 		modulesWithErrors[moduleAndVersion] = modulePreviousTries
 	}
@@ -527,7 +526,7 @@ func setOrUnsetGoProxy(usedProxy bool, targetRepo string, auth auth.ArtifactoryD
 		return utils.SetGoProxyWithApi(targetRepo, auth)
 	} else {
 		log.Debug("Trying download the dependencies from the VCS...")
-		return errorutils.CheckError(os.Unsetenv(utils.GOPROXY))
+		return errorutils.WrapError(os.Unsetenv(utils.GOPROXY))
 	}
 }
 
@@ -535,14 +534,14 @@ func getModuleAndVersion(usedProxy bool, err error) (string, error) {
 	splittedLine := strings.Split(err.Error(), ":")
 	utils.LogDebug(err, usedProxy)
 	if len(splittedLine) < 2 {
-		return "", errorutils.CheckError(errors.New("Missing module name and version in the error message " + err.Error()))
+		return "", errorutils.NewError("Missing module name and version in the error message " + err.Error())
 	}
 	return strings.TrimSpace(splittedLine[1]), nil
 }
 
 func populateModWithTidy(path string) error {
 	err := os.Chdir(filepath.Dir(path))
-	if errorutils.CheckError(err) != nil {
+	if errorutils.WrapError(err) != nil {
 		return err
 	}
 	log.Debug("Preparing to populate mod", filepath.Dir(path))
@@ -566,7 +565,7 @@ func removeGoSum(path string) error {
 	}
 	if exists {
 		err = os.Remove(goSum)
-		if errorutils.CheckError(err) != nil {
+		if errorutils.WrapError(err) != nil {
 			return err
 		}
 	}

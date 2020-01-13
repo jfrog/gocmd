@@ -96,7 +96,7 @@ func MaskCredentials(pattern *gofrogio.CmdOutputPattern) (string, error) {
 func Error(pattern *gofrogio.CmdOutputPattern) (string, error) {
 	_, err := fmt.Fprint(os.Stderr, pattern.Line)
 	if err != nil {
-		return "", errorutils.CheckError(err)
+		return "", errorutils.WrapError(err)
 	}
 	if len(pattern.MatchedResults) >= 3 {
 		return "", errors.New(pattern.MatchedResults[2] + ":" + strings.TrimSpace(pattern.MatchedResults[1]))
@@ -124,11 +124,11 @@ func RestoreSumFile(rootProjectDir string, sumFileContent []byte, sumFileStat os
 
 func GetFileDetails(filePath string) (modFileContent []byte, modFileStat os.FileInfo, err error) {
 	modFileStat, err = os.Stat(filePath)
-	if errorutils.CheckError(err) != nil {
+	if errorutils.WrapError(err) != nil {
 		return
 	}
 	modFileContent, err = ioutil.ReadFile(filePath)
-	errorutils.CheckError(err)
+	errorutils.WrapError(err)
 	return
 }
 

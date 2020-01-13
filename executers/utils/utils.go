@@ -35,7 +35,7 @@ func DependencyNotFoundInArtifactory(err error, noRegistry bool) bool {
 func SetGoProxyWithApi(repoName string, details auth.ArtifactoryDetails) error {
 	rtUrl, err := url.Parse(details.GetUrl())
 	if err != nil {
-		return errorutils.CheckError(err)
+		return errorutils.WrapError(err)
 	}
 
 	username := details.GetUser()
@@ -56,13 +56,13 @@ func SetGoProxyWithApi(repoName string, details auth.ArtifactoryDetails) error {
 	}
 	rtUrl.Path += "api/go/" + repoName
 	err = os.Setenv(GOPROXY, rtUrl.String())
-	return errorutils.CheckError(err)
+	return errorutils.WrapError(err)
 }
 
 func GetCachePath() (string, error) {
 	goPath, err := getGOPATH()
 	if err != nil {
-		return "", errorutils.CheckError(err)
+		return "", errorutils.WrapError(err)
 	}
 	return filepath.Join(goPath, "pkg", "mod", "cache", "download"), nil
 }
@@ -74,8 +74,8 @@ func getGOPATH() (string, error) {
 	}
 	goCmd.Command = []string{"env", "GOPATH"}
 	output, err := gofrogio.RunCmdOutput(goCmd)
-	if errorutils.CheckError(err) != nil {
-		return "", fmt.Errorf("Could not find GOPATH env: %s", err.Error())
+	if err != nil {
+		return "", errorutils.NewError(fmt.Sprintf("Could not find GOPATH env: %s", err.Error()))
 	}
 	return strings.TrimSpace(parseGoPath(string(output))), nil
 }

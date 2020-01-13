@@ -1,7 +1,6 @@
 package executers
 
 import (
-	"fmt"
 	"github.com/jfrog/gocmd/cmd"
 	"github.com/jfrog/gocmd/executers/utils"
 	"github.com/jfrog/gocmd/params"
@@ -15,7 +14,7 @@ func RunWithFallbacksAndPublish(goArg []string, noRegistry, publishDeps bool, re
 	if !noRegistry {
 		resolver := resolverDeployer.Resolver()
 		if resolver == nil || resolver.IsEmpty() {
-			return errorutils.CheckError(fmt.Errorf("Missing resolver information"))
+			return errorutils.NewError("Missing resolver information")
 		}
 		artDetails := resolver.ServiceManager().GetConfig().GetArtDetails()
 		err := utils.SetGoProxyWithApi(resolverDeployer.Resolver().Repo(), artDetails)

@@ -1,11 +1,10 @@
 module github.com/jfrog/gocmd
 
 require (
+	github.com/frankban/quicktest v1.7.2 // indirect
 	github.com/jfrog/gofrog v1.0.5
 	github.com/jfrog/jfrog-client-go v0.6.2
-	github.com/pkg/errors v0.8.1
-	golang.org/x/net v0.0.0-20181114220301-adae6a3d119a // indirect
-	golang.org/x/sys v0.0.0-20181116152217-5ac8a444bdc5 // indirect
+	github.com/pkg/errors v0.8.1 // indirect
 )
 
 go 1.13
