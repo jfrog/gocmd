@@ -1,8 +1,8 @@
 package tests
 
 import (
-	"github.com/jfrog/jfrog-client-go/utils/tests"
 	"github.com/jfrog/jfrog-client-go/utils/log"
+	"github.com/jfrog/jfrog-client-go/utils/tests"
 	"testing"
 )
 

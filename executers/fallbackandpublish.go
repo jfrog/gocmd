@@ -2,12 +2,13 @@ package executers
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/jfrog/gocmd/cmd"
 	"github.com/jfrog/gocmd/executers/utils"
 	"github.com/jfrog/gocmd/params"
 	"github.com/jfrog/jfrog-client-go/utils/errorutils"
 	"github.com/jfrog/jfrog-client-go/utils/log"
-	"os"
 )
 
 // Runs Go, with multiple fallbacks if needed and publish missing dependencies to Artifactory
@@ -17,7 +18,7 @@ func RunWithFallbacksAndPublish(goArg []string, noRegistry, publishDeps bool, re
 		if resolver == nil || resolver.IsEmpty() {
 			return errorutils.CheckError(fmt.Errorf("Missing resolver information"))
 		}
-		artDetails := resolver.ServiceManager().GetConfig().GetArtDetails()
+		artDetails := resolver.ServiceManager().GetConfig().GetCommonDetails()
 		err := utils.SetGoProxyWithApi(resolverDeployer.Resolver().Repo(), artDetails)
 		if err != nil {
 			return err
