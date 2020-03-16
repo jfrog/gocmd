@@ -8,4 +8,6 @@ require (
 	golang.org/x/sys v0.0.0-20181116152217-5ac8a444bdc5 // indirect
 )
 
+replace github.com/jfrog/jfrog-client-go => github.com/jfrog/jfrog-client-go dev
+
 go 1.13

@@ -1,15 +1,18 @@
 package executers
 
 import (
+	"net/url"
+	"os"
+
 	"github.com/jfrog/gocmd/cmd"
 	"github.com/jfrog/gocmd/executers/utils"
 	"github.com/jfrog/jfrog-client-go/artifactory"
-	"github.com/jfrog/jfrog-client-go/artifactory/auth"
+	artifactoryAuth "github.com/jfrog/jfrog-client-go/artifactory/auth"
+	"github.com/jfrog/jfrog-client-go/auth"
+	clientConfig "github.com/jfrog/jfrog-client-go/config"
 	clientutils "github.com/jfrog/jfrog-client-go/utils"
 	"github.com/jfrog/jfrog-client-go/utils/errorutils"
 	"github.com/jfrog/jfrog-client-go/utils/log"
-	"net/url"
-	"os"
 )
 
 // Run Go with fallback to VCS without publish
@@ -19,7 +22,7 @@ func RunWithFallback(goArg []string, url string) error {
 		return err
 	}
 
-	artDetails := serviceManager.GetConfig().GetArtDetails()
+	artDetails := serviceManager.GetConfig().GetCommonDetails()
 	err = setGoProxyWithoutApi(artDetails)
 	if err != nil {
 		return err
@@ -37,7 +40,7 @@ func RunWithFallback(goArg []string, url string) error {
 	return nil
 }
 
-func setGoProxyWithoutApi(details auth.ArtifactoryDetails) error {
+func setGoProxyWithoutApi(details auth.CommonDetails) error {
 	rtUrl, err := url.Parse(details.GetUrl())
 	if err != nil {
 		return errorutils.CheckError(err)
@@ -47,9 +50,9 @@ func setGoProxyWithoutApi(details auth.ArtifactoryDetails) error {
 }
 
 func createGoCentralServiceManager(url string) (*artifactory.ArtifactoryServicesManager, error) {
-	artifactoryDetails := auth.NewArtifactoryDetails()
+	artifactoryDetails := artifactoryAuth.NewArtifactoryDetails()
 	artifactoryDetails.SetUrl(clientutils.AddTrailingSlashIfNeeded(url))
-	serviceConfig, err := artifactory.NewConfigBuilder().SetArtDetails(artifactoryDetails).SetDryRun(false).Build()
+	serviceConfig, err := clientConfig.NewConfigBuilder().SetArtDetails(artifactoryDetails).SetDryRun(false).Build()
 	if err != nil {
 		return nil, err
 	}
