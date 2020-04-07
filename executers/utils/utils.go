@@ -5,7 +5,7 @@ import (
 	"github.com/jfrog/gocmd/cache"
 	"github.com/jfrog/gocmd/cmd"
 	gofrogio "github.com/jfrog/gofrog/io"
-	"github.com/jfrog/jfrog-client-go/artifactory/auth"
+	"github.com/jfrog/jfrog-client-go/auth"
 	"github.com/jfrog/jfrog-client-go/utils"
 	"github.com/jfrog/jfrog-client-go/utils/errorutils"
 	"github.com/jfrog/jfrog-client-go/utils/log"
@@ -32,7 +32,7 @@ func DependencyNotFoundInArtifactory(err error, noRegistry bool) bool {
 	return false
 }
 
-func SetGoProxyWithApi(repoName string, details auth.ArtifactoryDetails) error {
+func SetGoProxyWithApi(repoName string, details auth.CommonDetails) error {
 	rtUrl, err := url.Parse(details.GetUrl())
 	if err != nil {
 		return errorutils.CheckError(err)
