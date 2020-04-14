@@ -38,7 +38,7 @@ func collectDependenciesAndPublish(failOnError, publishDeps bool, dependenciesIn
 	}
 	cache := cache.DependenciesCache{}
 	// The collection of project dependencies requires the resolver information
-	dependenciesToPublish, err := collectProjectDependencies(resolverDeployer.Resolver().Repo(), rootProjectDir, &cache, resolverDeployer.Resolver().ServiceManager().GetConfig().GetCommonDetails())
+	dependenciesToPublish, err := collectProjectDependencies(resolverDeployer.Resolver().Repo(), rootProjectDir, &cache, resolverDeployer.Resolver().ServiceManager().GetConfig().GetServiceDetails())
 	if err != nil || len(dependenciesToPublish) == 0 {
 		return err
 	}
@@ -83,7 +83,7 @@ func findMissingDepedencies(cache *cache.DependenciesCache, dependenciesToPublis
 	for module := range dependenciesToPublish {
 		nameAndVersion := strings.Split(module, "@")
 		// Perform a head request for the deployer server
-		resp, err := performHeadRequest(resolverDeployer.Deployer().ServiceManager().GetConfig().GetCommonDetails(), client, resolverDeployer.Deployer().Repo(), nameAndVersion[0], nameAndVersion[1])
+		resp, err := performHeadRequest(resolverDeployer.Deployer().ServiceManager().GetConfig().GetServiceDetails(), client, resolverDeployer.Deployer().Repo(), nameAndVersion[0], nameAndVersion[1])
 		if err != nil {
 			return err
 		}
@@ -115,7 +115,7 @@ func populateAndPublish(targetRepo, cachePath string, dependenciesInterface GoPa
 }
 
 // Collects the dependencies of the project
-func collectProjectDependencies(targetRepo, rootProjectDir string, cache *cache.DependenciesCache, auth auth.CommonDetails) (map[string]bool, error) {
+func collectProjectDependencies(targetRepo, rootProjectDir string, cache *cache.DependenciesCache, auth auth.ServiceDetails) (map[string]bool, error) {
 	dependenciesMap, err := getDependenciesGraphWithFallback(targetRepo, auth)
 	if err != nil {
 		return nil, err
@@ -141,7 +141,7 @@ func collectProjectDependencies(targetRepo, rootProjectDir string, cache *cache.
 	return projectDependencies, nil
 }
 
-func downloadDependencies(targetRepo string, cache *cache.DependenciesCache, depSlice map[string]bool, auth auth.CommonDetails) (map[string]bool, error) {
+func downloadDependencies(targetRepo string, cache *cache.DependenciesCache, depSlice map[string]bool, auth auth.ServiceDetails) (map[string]bool, error) {
 	client, err := httpclient.ClientBuilder().Build()
 	if err != nil {
 		return nil, err
@@ -172,7 +172,7 @@ func downloadDependencies(targetRepo string, cache *cache.DependenciesCache, dep
 	return dependenciesMap, nil
 }
 
-func performHeadRequest(auth auth.CommonDetails, client *httpclient.HttpClient, targetRepo, module, version string) (*http.Response, error) {
+func performHeadRequest(auth auth.ServiceDetails, client *httpclient.HttpClient, targetRepo, module, version string) (*http.Response, error) {
 	url := auth.GetUrl() + "api/go/" + targetRepo + "/" + module + "/@v/" + version + ".mod"
 	resp, _, err := client.SendHead(url, auth.CreateHttpClientDetails())
 	if err != nil {
@@ -230,7 +230,7 @@ func goModDecode(name string) string {
 }
 
 // Runs the go mod download command. Should set first the environment variable of GoProxy
-func downloadDependency(downloadFromArtifactory bool, fullDependencyName, targetRepo string, auth auth.CommonDetails) error {
+func downloadDependency(downloadFromArtifactory bool, fullDependencyName, targetRepo string, auth auth.ServiceDetails) error {
 	var err error
 	if downloadFromArtifactory {
 		log.Debug("Downloading dependency from Artifactory:", fullDependencyName)
@@ -248,7 +248,7 @@ func downloadDependency(downloadFromArtifactory bool, fullDependencyName, target
 }
 
 // Downloads the mod file from Artifactory to the Go cache
-func downloadModFileFromArtifactoryToLocalCache(cachePath, targetRepo, name, version string, auth auth.CommonDetails, client *httpclient.HttpClient) string {
+func downloadModFileFromArtifactoryToLocalCache(cachePath, targetRepo, name, version string, auth auth.ServiceDetails, client *httpclient.HttpClient) string {
 	pathToModuleCache := filepath.Join(cachePath, name, "@v")
 	dirExists, err := fileutils.IsDirExists(pathToModuleCache, false)
 	if err != nil {
@@ -278,7 +278,7 @@ func downloadModFileFromArtifactoryToLocalCache(cachePath, targetRepo, name, ver
 	return ""
 }
 
-func downloadAndCreateDependency(cachePath, name, version, fullDependencyName, targetRepo string, downloadedFromArtifactory bool, auth auth.CommonDetails) (*Package, error) {
+func downloadAndCreateDependency(cachePath, name, version, fullDependencyName, targetRepo string, downloadedFromArtifactory bool, auth auth.ServiceDetails) (*Package, error) {
 	// Dependency is missing within the cache. Need to download it...
 	err := downloadDependency(downloadedFromArtifactory, fullDependencyName, targetRepo, auth)
 	if err != nil {
@@ -292,7 +292,7 @@ func downloadAndCreateDependency(cachePath, name, version, fullDependencyName, t
 	return dep, nil
 }
 
-func shouldDownloadFromArtifactory(module, version, targetRepo string, auth auth.CommonDetails, client *httpclient.HttpClient) (bool, error) {
+func shouldDownloadFromArtifactory(module, version, targetRepo string, auth auth.ServiceDetails, client *httpclient.HttpClient) (bool, error) {
 	res, err := performHeadRequest(auth, client, targetRepo, module, version)
 	if err != nil {
 		return false, err
@@ -487,7 +487,7 @@ func parseModForReplaceDependencies(modFileContent string) ([]string, error) {
 }
 
 // Runs go mod graph command with fallback.
-func getDependenciesGraphWithFallback(targetRepo string, auth auth.CommonDetails) (map[string]bool, error) {
+func getDependenciesGraphWithFallback(targetRepo string, auth auth.ServiceDetails) (map[string]bool, error) {
 	dependenciesMap := map[string]bool{}
 	modulesWithErrors := map[string]previousTries{}
 	usedProxy := true
@@ -521,7 +521,7 @@ func getDependenciesGraphWithFallback(targetRepo string, auth auth.CommonDetails
 	return dependenciesMap, nil
 }
 
-func setOrUnsetGoProxy(usedProxy bool, targetRepo string, auth auth.CommonDetails) error {
+func setOrUnsetGoProxy(usedProxy bool, targetRepo string, auth auth.ServiceDetails) error {
 	if !usedProxy {
 		log.Debug("Trying download the dependencies from Artifactory...")
 		return utils.SetGoProxyWithApi(targetRepo, auth)

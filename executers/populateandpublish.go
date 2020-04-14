@@ -61,7 +61,7 @@ func (pwd *PackageWithDeps) New(cachePath string, dependency Package) GoPackage 
 func (pwd *PackageWithDeps) PopulateModAndPublish(targetRepo string, cache *cache.DependenciesCache, serviceManager *artifactory.ArtifactoryServicesManager) error {
 	var path string
 	log.Debug("Starting to work on", pwd.Dependency.GetId())
-	serviceManager.GetConfig().GetCommonDetails()
+	serviceManager.GetConfig().GetServiceDetails()
 	dependenciesMap := cache.GetMap()
 	published, _ := dependenciesMap[pwd.Dependency.GetId()]
 	if published {
@@ -71,7 +71,7 @@ func (pwd *PackageWithDeps) PopulateModAndPublish(targetRepo string, cache *cach
 		if err != nil {
 			return err
 		}
-		path = downloadModFileFromArtifactoryToLocalCache(pwd.cachePath, targetRepo, moduleAndVersion[0], moduleAndVersion[1], serviceManager.GetConfig().GetCommonDetails(), client)
+		path = downloadModFileFromArtifactoryToLocalCache(pwd.cachePath, targetRepo, moduleAndVersion[0], moduleAndVersion[1], serviceManager.GetConfig().GetServiceDetails(), client)
 		err = pwd.updateModContent(path, cache)
 		utils.LogError(err)
 	}
@@ -284,7 +284,7 @@ func (pwd *PackageWithDeps) publishDependencyAndPopulateTransitive(pathToModFile
 	if len(graphDependencies) > 0 {
 		sumFileContent, sumFileStat, err := cmd.GetGoSum(filepath.Dir(pathToModFile))
 		utils.LogError(err)
-		pwd.setTransitiveDependencies(targetRepo, graphDependencies, cache, serviceManager.GetConfig().GetCommonDetails())
+		pwd.setTransitiveDependencies(targetRepo, graphDependencies, cache, serviceManager.GetConfig().GetServiceDetails())
 		if len(sumFileContent) > 0 && sumFileStat != nil {
 			cmd.RestoreSumFile(filepath.Dir(pathToModFile), sumFileContent, sumFileStat)
 		}
@@ -325,7 +325,7 @@ func (pwd *PackageWithDeps) prepareAndPublish(targetRepo string, cache *cache.De
 	return err
 }
 
-func (pwd *PackageWithDeps) setTransitiveDependencies(targetRepo string, graphDependencies map[string]bool, cache *cache.DependenciesCache, auth auth.CommonDetails) {
+func (pwd *PackageWithDeps) setTransitiveDependencies(targetRepo string, graphDependencies map[string]bool, cache *cache.DependenciesCache, auth auth.ServiceDetails) {
 	var dependencies []PackageWithDeps
 	for transitiveDependency := range graphDependencies {
 		module := strings.Split(transitiveDependency, "@")
