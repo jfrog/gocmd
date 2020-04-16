@@ -22,7 +22,7 @@ func RunWithFallback(goArg []string, url string) error {
 		return err
 	}
 
-	artDetails := serviceManager.GetConfig().GetCommonDetails()
+	artDetails := serviceManager.GetConfig().GetServiceDetails()
 	err = setGoProxyWithoutApi(artDetails)
 	if err != nil {
 		return err
@@ -40,7 +40,7 @@ func RunWithFallback(goArg []string, url string) error {
 	return nil
 }
 
-func setGoProxyWithoutApi(details auth.CommonDetails) error {
+func setGoProxyWithoutApi(details auth.ServiceDetails) error {
 	rtUrl, err := url.Parse(details.GetUrl())
 	if err != nil {
 		return errorutils.CheckError(err)
@@ -52,7 +52,7 @@ func setGoProxyWithoutApi(details auth.CommonDetails) error {
 func createGoCentralServiceManager(url string) (*artifactory.ArtifactoryServicesManager, error) {
 	artifactoryDetails := artifactoryAuth.NewArtifactoryDetails()
 	artifactoryDetails.SetUrl(clientutils.AddTrailingSlashIfNeeded(url))
-	serviceConfig, err := clientConfig.NewConfigBuilder().SetArtDetails(artifactoryDetails).SetDryRun(false).Build()
+	serviceConfig, err := clientConfig.NewConfigBuilder().SetServiceDetails(artifactoryDetails).SetDryRun(false).Build()
 	if err != nil {
 		return nil, err
 	}

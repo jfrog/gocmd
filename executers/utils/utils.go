@@ -32,7 +32,7 @@ func DependencyNotFoundInArtifactory(err error, noRegistry bool) bool {
 	return false
 }
 
-func SetGoProxyWithApi(repoName string, details auth.CommonDetails) error {
+func SetGoProxyWithApi(repoName string, details auth.ServiceDetails) error {
 	rtUrl, err := url.Parse(details.GetUrl())
 	if err != nil {
 		return errorutils.CheckError(err)
