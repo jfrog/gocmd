@@ -91,7 +91,15 @@ func RunGo(goArg []string) error {
 		return err
 	}
 
-	_, _, _, err = gofrogcmd.RunCmdWithOutputParser(goCmd, true, protocolRegExp, notFoundRegExp, notFoundGo113RegExp, unrecognizedImportRegExp, unknownRevisionRegExp, notFoundZipRegExp)
+	performPasswordMask, err := shouldMaskPassword()
+	if err != nil {
+		return err
+	}
+	if performPasswordMask {
+		_, _, _, err = gofrogcmd.RunCmdWithOutputParser(goCmd, true, protocolRegExp, notFoundRegExp, notFoundGo113RegExp, unrecognizedImportRegExp, unknownRevisionRegExp, notFoundZipRegExp)
+	} else {
+		_, _, _, err = gofrogcmd.RunCmdWithOutputParser(goCmd, true, notFoundRegExp, notFoundGo113RegExp, unrecognizedImportRegExp, unknownRevisionRegExp, notFoundZipRegExp)
+	}
 	return errorutils.CheckError(err)
 }
 
@@ -140,14 +148,26 @@ func GetDependenciesGraph() (map[string]bool, error) {
 	if err != nil {
 		return nil, err
 	}
-	output, _, _, err := gofrogcmd.RunCmdWithOutputParser(goCmd, true, protocolRegExp, notFoundRegExp, unrecognizedImportRegExp, unknownRevisionRegExp)
+
+	performPasswordMask, err := shouldMaskPassword()
+	if err != nil {
+		return nil, err
+	}
+	var output string
+	var executionError error
+	if performPasswordMask {
+		output, _, _, executionError = gofrogcmd.RunCmdWithOutputParser(goCmd, true, protocolRegExp, notFoundRegExp, unrecognizedImportRegExp, unknownRevisionRegExp)
+	} else {
+		output, _, _, executionError = gofrogcmd.RunCmdWithOutputParser(goCmd, true, notFoundRegExp, unrecognizedImportRegExp, unknownRevisionRegExp)
+	}
+
 	if len(output) != 0 {
 		log.Debug(output)
 	}
 
-	if err != nil {
+	if executionError != nil {
 		// If the command fails, the mod stays the same, therefore, don't need to be restored.
-		return nil, errorutils.CheckError(err)
+		return nil, errorutils.CheckError(executionError)
 	}
 
 	// Restore the the go.mod and go.sum files, to make sure they stay the same as before
