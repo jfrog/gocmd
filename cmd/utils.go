@@ -8,11 +8,18 @@ import (
 	"github.com/jfrog/jfrog-client-go/utils/errorutils"
 	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
 	"github.com/jfrog/jfrog-client-go/utils/log"
+	"github.com/jfrog/jfrog-client-go/utils/version"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 )
+
+// Minimum go version, which its output does not require to mask passwords in URLs.
+const minimumGoVersion = "go1.13"
+
+// Never use this value, use shouldMaskPassword().
+var shouldMask *bool = nil
 
 func prepareRegExp() error {
 	err := prepareGlobalRegExp()
@@ -144,4 +151,30 @@ func outputToMap(output string) map[string]bool {
 		}
 	}
 	return mapOfDeps
+}
+
+// Go performs password redaction from url since version 1.13.
+// Only if go version before 1.13, should manually perform password masking.
+func shouldMaskPassword() (bool, error) {
+	if shouldMask == nil {
+		goVersion, err := getParsedGoVersion()
+		if err != nil {
+			return false, err
+		}
+		shouldMaskBool := !goVersion.AtLeast(minimumGoVersion)
+		shouldMask = &shouldMaskBool
+	}
+
+	return *shouldMask, nil
+}
+
+func getParsedGoVersion() (*version.Version, error) {
+	output, err := GetGoVersion()
+	if err != nil {
+		return nil, errorutils.CheckError(err)
+	}
+	// Go version output pattern is: 'go version go1.14.1 darwin/amd64'
+	// Thus should take the third element.
+	splitOutput := strings.Split(output, " ")
+	return version.NewVersion(splitOutput[2]), nil
 }
