@@ -30,7 +30,7 @@ func (resolverDeployer *ResolverDeployer) SetDeployer(deployer *Params) *Resolve
 
 type Params struct {
 	repo           string
-	serviceManager *artifactory.ArtifactoryServicesManager
+	serviceManager artifactory.ArtifactoryServicesManager
 }
 
 func (params *Params) Repo() string {
@@ -42,11 +42,11 @@ func (params *Params) SetRepo(repo string) *Params {
 	return params
 }
 
-func (params *Params) ServiceManager() *artifactory.ArtifactoryServicesManager {
+func (params *Params) ServiceManager() artifactory.ArtifactoryServicesManager {
 	return params.serviceManager
 }
 
-func (params *Params) SetServiceManager(serviceManager *artifactory.ArtifactoryServicesManager) *Params {
+func (params *Params) SetServiceManager(serviceManager artifactory.ArtifactoryServicesManager) *Params {
 	params.serviceManager = serviceManager
 	return params
 }

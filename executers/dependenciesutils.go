@@ -101,7 +101,7 @@ func findMissingDepedencies(cache *cache.DependenciesCache, dependenciesToPublis
 	return nil
 }
 
-func populateAndPublish(targetRepo, cachePath string, dependenciesInterface GoPackage, packageDependencies []Package, cache *cache.DependenciesCache, serviceManager *artifactory.ArtifactoryServicesManager) error {
+func populateAndPublish(targetRepo, cachePath string, dependenciesInterface GoPackage, packageDependencies []Package, cache *cache.DependenciesCache, serviceManager artifactory.ArtifactoryServicesManager) error {
 	cache.IncrementTotal(len(packageDependencies))
 	for _, dep := range packageDependencies {
 		dependenciesInterface = dependenciesInterface.New(cachePath, dep)

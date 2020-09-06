@@ -12,9 +12,9 @@ import (
 )
 
 type GoPackage interface {
-	PopulateModAndPublish(targetRepo string, cache *cache.DependenciesCache, serviceManager *artifactory.ArtifactoryServicesManager) error
+	PopulateModAndPublish(targetRepo string, cache *cache.DependenciesCache, serviceManager artifactory.ArtifactoryServicesManager) error
 	Init() error
-	prepareAndPublish(targetRepo string, cache *cache.DependenciesCache, serviceManager *artifactory.ArtifactoryServicesManager) error
+	prepareAndPublish(targetRepo string, cache *cache.DependenciesCache, serviceManager artifactory.ArtifactoryServicesManager) error
 	New(cachePath string, dependency Package) GoPackage
 }
 
@@ -61,7 +61,7 @@ func (dependencyPackage *Package) Init() error {
 	return nil
 }
 
-func (dependencyPackage *Package) PopulateModAndPublish(targetRepo string, cache *cache.DependenciesCache, serviceManager *artifactory.ArtifactoryServicesManager) error {
+func (dependencyPackage *Package) PopulateModAndPublish(targetRepo string, cache *cache.DependenciesCache, serviceManager artifactory.ArtifactoryServicesManager) error {
 	published, _ := cache.GetMap()[dependencyPackage.GetId()]
 	if !published {
 		return dependencyPackage.prepareAndPublish(targetRepo, cache, serviceManager)
@@ -72,7 +72,7 @@ func (dependencyPackage *Package) PopulateModAndPublish(targetRepo string, cache
 }
 
 // Prepare for publishing and publish the dependency to Artifactory
-func (dependencyPackage *Package) prepareAndPublish(targetRepo string, cache *cache.DependenciesCache, serviceManager *artifactory.ArtifactoryServicesManager) error {
+func (dependencyPackage *Package) prepareAndPublish(targetRepo string, cache *cache.DependenciesCache, serviceManager artifactory.ArtifactoryServicesManager) error {
 	successOutOfTotal := fmt.Sprintf("%d/%d", cache.GetSuccesses()+1, cache.GetTotal())
 	err := dependencyPackage.Publish(successOutOfTotal, targetRepo, serviceManager)
 	if err != nil {
@@ -83,7 +83,7 @@ func (dependencyPackage *Package) prepareAndPublish(targetRepo string, cache *ca
 	return nil
 }
 
-func (dependencyPackage *Package) Publish(summary string, targetRepo string, servicesManager *artifactory.ArtifactoryServicesManager) error {
+func (dependencyPackage *Package) Publish(summary string, targetRepo string, servicesManager artifactory.ArtifactoryServicesManager) error {
 	message := fmt.Sprintf("Publishing: %s to %s", dependencyPackage.id, targetRepo)
 	if summary != "" {
 		message += ":" + summary

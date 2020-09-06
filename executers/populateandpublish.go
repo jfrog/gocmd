@@ -58,7 +58,7 @@ func (pwd *PackageWithDeps) New(cachePath string, dependency Package) GoPackage 
 }
 
 // Populate the mod file and publish the dependency and it's transitive dependencies to Artifactory
-func (pwd *PackageWithDeps) PopulateModAndPublish(targetRepo string, cache *cache.DependenciesCache, serviceManager *artifactory.ArtifactoryServicesManager) error {
+func (pwd *PackageWithDeps) PopulateModAndPublish(targetRepo string, cache *cache.DependenciesCache, serviceManager artifactory.ArtifactoryServicesManager) error {
 	var path string
 	log.Debug("Starting to work on", pwd.Dependency.GetId())
 	serviceManager.GetConfig().GetServiceDetails()
@@ -279,7 +279,7 @@ func (pwd *PackageWithDeps) getModPathInTemp(tempDir string) string {
 	return path
 }
 
-func (pwd *PackageWithDeps) publishDependencyAndPopulateTransitive(pathToModFile, targetRepo string, graphDependencies map[string]bool, cache *cache.DependenciesCache, serviceManager *artifactory.ArtifactoryServicesManager) error {
+func (pwd *PackageWithDeps) publishDependencyAndPopulateTransitive(pathToModFile, targetRepo string, graphDependencies map[string]bool, cache *cache.DependenciesCache, serviceManager artifactory.ArtifactoryServicesManager) error {
 	// If the mod is not empty, populate transitive dependencies
 	if len(graphDependencies) > 0 {
 		sumFileContent, sumFileStat, err := cmd.GetGoSum(filepath.Dir(pathToModFile))
@@ -319,7 +319,7 @@ func (pwd *PackageWithDeps) publishDependencyAndPopulateTransitive(pathToModFile
 
 // Prepare for publishing and publish the dependency to Artifactory
 // Mark this dependency as published
-func (pwd *PackageWithDeps) prepareAndPublish(targetRepo string, cache *cache.DependenciesCache, serviceManager *artifactory.ArtifactoryServicesManager) error {
+func (pwd *PackageWithDeps) prepareAndPublish(targetRepo string, cache *cache.DependenciesCache, serviceManager artifactory.ArtifactoryServicesManager) error {
 	err := pwd.Dependency.prepareAndPublish(targetRepo, cache, serviceManager)
 	cache.GetMap()[pwd.Dependency.GetId()] = true
 	return err
@@ -387,7 +387,7 @@ func (pwd *PackageWithDeps) writeModContentToGoCache() error {
 }
 
 // Runs over the transitive dependencies, populate the mod files of those transitive dependencies
-func (pwd *PackageWithDeps) populateTransitive(targetRepo string, cache *cache.DependenciesCache, serviceManager *artifactory.ArtifactoryServicesManager) {
+func (pwd *PackageWithDeps) populateTransitive(targetRepo string, cache *cache.DependenciesCache, serviceManager artifactory.ArtifactoryServicesManager) {
 	cache.IncrementTotal(len(pwd.transitiveDependencies))
 	for _, transitiveDep := range pwd.transitiveDependencies {
 		published, _ := cache.GetMap()[transitiveDep.Dependency.GetId()]
