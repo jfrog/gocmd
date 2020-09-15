@@ -49,7 +49,7 @@ func setGoProxyWithoutApi(details auth.ServiceDetails) error {
 	return errorutils.CheckError(err)
 }
 
-func createGoCentralServiceManager(url string) (*artifactory.ArtifactoryServicesManager, error) {
+func createGoCentralServiceManager(url string) (artifactory.ArtifactoryServicesManager, error) {
 	artifactoryDetails := artifactoryAuth.NewArtifactoryDetails()
 	artifactoryDetails.SetUrl(clientutils.AddTrailingSlashIfNeeded(url))
 	serviceConfig, err := clientConfig.NewConfigBuilder().SetServiceDetails(artifactoryDetails).SetDryRun(false).Build()
