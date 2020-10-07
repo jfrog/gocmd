@@ -42,12 +42,14 @@ func NewCmd() (*Cmd, error) {
 	return &Cmd{Go: execPath}, nil
 }
 
-func (config *Cmd) GetCmd() *exec.Cmd {
-	var cmd []string
-	cmd = append(cmd, config.Go)
-	cmd = append(cmd, config.Command...)
-	cmd = append(cmd, config.CommandFlags...)
-	return exec.Command(cmd[0], cmd[1:]...)
+func (config *Cmd) GetCmd() (cmd *exec.Cmd) {
+	var cmdStr []string
+	cmdStr = append(cmdStr, config.Go)
+	cmdStr = append(cmdStr, config.Command...)
+	cmdStr = append(cmdStr, config.CommandFlags...)
+	cmd = exec.Command(cmdStr[0], cmdStr[1:]...)
+	cmd.Dir = config.Dir
+	return
 }
 
 func (config *Cmd) GetEnv() map[string]string {
@@ -66,6 +68,7 @@ type Cmd struct {
 	Go           string
 	Command      []string
 	CommandFlags []string
+	Dir          string
 	StrWriter    io.WriteCloser
 	ErrWriter    io.WriteCloser
 }
@@ -115,15 +118,13 @@ func DownloadDependency(dependencyName string) error {
 }
 
 // Runs go mod graph command and returns slice of the dependencies
-func GetDependenciesGraph() (map[string]bool, error) {
-	pwd, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
-
-	projectDir, err := GetProjectRoot()
-	if err != nil {
-		return nil, err
+func GetDependenciesGraph(projectDir string) (map[string]bool, error) {
+	var err error
+	if projectDir == "" {
+		projectDir, err = GetProjectRoot()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Read and store the details of the go.mod and go.sum files,
@@ -137,12 +138,13 @@ func GetDependenciesGraph() (map[string]bool, error) {
 		defer RestoreSumFile(projectDir, sumFileContent, sumFileStat)
 	}
 
-	log.Info("Running 'go mod graph' in", pwd)
+	log.Info("Running 'go mod graph' in", projectDir)
 	goCmd, err := NewCmd()
 	if err != nil {
 		return nil, err
 	}
 	goCmd.Command = []string{"mod", "graph"}
+	goCmd.Dir = projectDir
 
 	err = prepareGlobalRegExp()
 	if err != nil {
