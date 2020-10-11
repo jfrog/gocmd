@@ -72,6 +72,9 @@ func GetArtifactoryApiUrl(repoName string, details auth.ServiceDetails) (string,
 	return rtUrl.String(), nil
 }
 
+// GetPackageVersion returns the matching version for the packageName string using the given artifactory details that provided.
+// PackageName string should be in the following format: <Package Path>/@V/<Requested Branch Name>.info OR latest.info
+// For example the jfrog/jfrog-cli/@v/master.info packageName will return the corresponding canonical version string for the jfrog-cli master branch.
 func GetPackageVersion(repoName, packageName string, details auth.ServiceDetails) (string, error) {
 	artifactoryApiUrl, err := GetArtifactoryApiUrl(repoName, details)
 	if err != nil {
@@ -85,7 +88,7 @@ func GetPackageVersion(repoName, packageName string, details auth.ServiceDetails
 	artifactoryApiUrl = artifactoryApiUrl + "/" + packageName
 	resp, body, _, err := client.SendGet(artifactoryApiUrl, true, artHttpDetails)
 	if err != nil {
-		return "", errorutils.CheckError(err)
+		return "", err
 	}
 	if resp.StatusCode != http.StatusOK {
 		return "", errorutils.CheckError(errors.New("Artifactory response: " + resp.Status))
@@ -94,31 +97,34 @@ func GetPackageVersion(repoName, packageName string, details auth.ServiceDetails
 	var version PackageVersionResponseContent
 	err = json.Unmarshal(body, &version)
 	if err != nil {
-		return "", err
+		return "", errorutils.CheckError(err)
 	}
-
 	return version.Version, nil
 }
 
+// GetCachePath returns the location of downloads dir insied the GOMODCACHE
 func GetCachePath() (string, error) {
-	goPath, err := getGOPATH()
+	goModCachePath, err := GetGoModCachePath()
 	if err != nil {
-		return "", errorutils.CheckError(err)
+		return "", err
 	}
-	return filepath.Join(goPath, "pkg", "mod", "cache", "download"), nil
+	return filepath.Join(goModCachePath, "cache", "download"), nil
 }
-func GetPackagePath() (string, error) {
+
+// GetGoModCachePath returns the location of the go module cache
+func GetGoModCachePath() (string, error) {
 	goPath, err := getGOPATH()
 	if err != nil {
-		return "", errorutils.CheckError(err)
+		return "", err
 	}
 	return filepath.Join(goPath, "pkg", "mod"), nil
 }
 
+// GetGOPATH returns the location of the GOPATH
 func getGOPATH() (string, error) {
 	goCmd, err := cmd.NewCmd()
 	if err != nil {
-		return "", err
+		return "", errorutils.CheckError(err)
 	}
 	goCmd.Command = []string{"env", "GOPATH"}
 	output, err := gofrogio.RunCmdOutput(goCmd)
@@ -189,6 +195,5 @@ func parseGoPath(goPath string) string {
 }
 
 type PackageVersionResponseContent struct {
-	Version   string `json:"Version,omitempty"`
-	TimeStamp string `json:"Time,omitempty"`
+	Version string `json:"Version,omitempty"`
 }
