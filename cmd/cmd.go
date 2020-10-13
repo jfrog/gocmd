@@ -131,7 +131,8 @@ func GetDependenciesGraph(projectDir string) (map[string]bool, error) {
 	// because they may change by the "go mod graph" command.
 	modFileContent, modFileStat, err := GetFileDetails(filepath.Join(projectDir, "go.mod"))
 	if err != nil {
-		return nil, err
+		log.Info("Dependencies were not collected because could not find go.mod in", projectDir)
+		return nil, nil
 	}
 	sumFileContent, sumFileStat, err := GetGoSum(projectDir)
 	if len(sumFileContent) > 0 && sumFileStat != nil {
