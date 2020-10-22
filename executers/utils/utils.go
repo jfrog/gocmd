@@ -72,9 +72,9 @@ func GetArtifactoryApiUrl(repoName string, details auth.ServiceDetails) (string,
 	return rtUrl.String(), nil
 }
 
-// GetPackageVersion returns the matching version for the packageName string using the given artifactory details that provided.
+// GetPackageVersion returns the matching version for the packageName string using the Artifactory details that are provided.
 // PackageName string should be in the following format: <Package Path>/@V/<Requested Branch Name>.info OR latest.info
-// For example the jfrog/jfrog-cli/@v/master.info packageName will return the corresponding canonical version string for the jfrog-cli master branch.
+// For example the jfrog/jfrog-cli/@v/master.info packageName will return the corresponding canonical version (vX.Y.Z) string for the jfrog-cli master branch.
 func GetPackageVersion(repoName, packageName string, details auth.ServiceDetails) (string, error) {
 	artifactoryApiUrl, err := GetArtifactoryApiUrl(repoName, details)
 	if err != nil {

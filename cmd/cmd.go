@@ -2,15 +2,16 @@ package cmd
 
 import (
 	"errors"
-	gofrogcmd "github.com/jfrog/gofrog/io"
-	"github.com/jfrog/jfrog-client-go/utils/errorutils"
-	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
-	"github.com/jfrog/jfrog-client-go/utils/log"
 	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
+
+	gofrogcmd "github.com/jfrog/gofrog/io"
+	"github.com/jfrog/jfrog-client-go/utils/errorutils"
+	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
+	"github.com/jfrog/jfrog-client-go/utils/log"
 )
 
 // Used for masking basic auth credentials as part of a URL.
@@ -131,7 +132,7 @@ func GetDependenciesGraph(projectDir string) (map[string]bool, error) {
 	// because they may change by the "go mod graph" command.
 	modFileContent, modFileStat, err := GetFileDetails(filepath.Join(projectDir, "go.mod"))
 	if err != nil {
-		log.Info("Dependencies were not collected because could not find go.mod in", projectDir)
+		log.Info("Dependencies were not collected for this build, since go.mod could not be found in", projectDir)
 		return nil, nil
 	}
 	sumFileContent, sumFileStat, err := GetGoSum(projectDir)
