@@ -500,7 +500,7 @@ func getDependenciesGraphWithFallback(targetRepo string, auth auth.ServiceDetail
 		}
 
 		usedProxy = !usedProxy
-		dependenciesMap, err = cmd.GetDependenciesGraph()
+		dependenciesMap, err = cmd.GetDependenciesGraph("")
 		if err == nil {
 			break
 		}
@@ -575,7 +575,7 @@ func removeGoSum(path string) error {
 
 func runGoModGraph() (output map[string]bool, err error) {
 	// Running go mod graph command
-	return cmd.GetDependenciesGraph()
+	return cmd.GetDependenciesGraph("")
 }
 
 type previousTries struct {
