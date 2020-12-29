@@ -34,7 +34,7 @@ func prepareGlobalRegExp() error {
 	var err error
 	if protocolRegExp == nil {
 		log.Debug("Initializing protocol regexp")
-		protocolRegExp, err = initRegExp(utils.CredentialsInUrlRegexp, MaskCredentials)
+		protocolRegExp, err = initRegExp(utils.CredentialsInUrlRegexp, RemoveCredentials)
 		if err != nil {
 			return err
 		}
@@ -95,8 +95,8 @@ func initRegExp(regex string, execFunc func(pattern *gofrogio.CmdOutputPattern) 
 	return outputPattern, nil
 }
 
-// Mask the credentials information from the line.
-func MaskCredentials(pattern *gofrogio.CmdOutputPattern) (string, error) {
+// Remove the credentials information from the line.
+func RemoveCredentials(pattern *gofrogio.CmdOutputPattern) (string, error) {
 	return utils.RemoveCredentials(pattern.Line, pattern.MatchedResults[0]), nil
 }
 
