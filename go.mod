@@ -6,6 +6,6 @@ require (
 	github.com/pkg/errors v0.8.1
 )
 
-// replace github.com/jfrog/jfrog-client-go => github.com/jfrog/jfrog-client-go dev
+replace github.com/jfrog/jfrog-client-go => github.com/jfrog/jfrog-client-go dev
 
 go 1.13
