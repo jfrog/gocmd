@@ -97,7 +97,7 @@ func initRegExp(regex string, execFunc func(pattern *gofrogio.CmdOutputPattern) 
 
 // Mask the credentials information from the line.
 func MaskCredentials(pattern *gofrogio.CmdOutputPattern) (string, error) {
-	return utils.MaskCredentials(pattern.Line, pattern.MatchedResults[0]), nil
+	return utils.RemoveCredentials(pattern.Line, pattern.MatchedResults[0]), nil
 }
 
 func Error(pattern *gofrogio.CmdOutputPattern) (string, error) {

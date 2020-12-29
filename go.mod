@@ -2,7 +2,7 @@ module github.com/jfrog/gocmd
 
 require (
 	github.com/jfrog/gofrog v1.0.6
-	github.com/jfrog/jfrog-client-go v0.15.0
+	github.com/jfrog/jfrog-client-go dev
 	github.com/pkg/errors v0.8.1
 )
 
