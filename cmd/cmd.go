@@ -145,7 +145,7 @@ func GetDependenciesGraph(projectDir string) (map[string]bool, error) {
 	if err != nil {
 		return nil, err
 	}
-	goCmd.Command = []string{"mod", "graph"}
+	goCmd.Command = []string{"list", "-m", "all"}
 	goCmd.Dir = projectDir
 
 	err = prepareGlobalRegExp()

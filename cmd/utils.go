@@ -142,13 +142,35 @@ func GetFileDetails(filePath string) (modFileContent []byte, modFileStat os.File
 
 func outputToMap(output string) map[string]bool {
 	lineOutput := strings.Split(output, "\n")
-	var result []string
 	mapOfDeps := map[string]bool{}
-	for _, line := range lineOutput {
-		splitLine := strings.Split(line, " ")
-		if len(splitLine) == 2 {
-			mapOfDeps[splitLine[1]] = true
-			result = append(result, splitLine[1])
+	lines := len(lineOutput)
+	i := 0
+	// Ignore all 'go' messages
+	for ; i < lines; i++ {
+		splitLine := strings.Split(lineOutput[i], " ")
+		if splitLine[0] != "go:" {
+			break
+		}
+	}
+	// First dependency in the list  is the module itself
+	i++
+	for ; i < lines; i++ {
+		splitLine := strings.Split(lineOutput[i], " ")
+		splitLineLen := len(splitLine)
+		if splitLineLen == 2 {
+			mapOfDeps[splitLine[0]+"@"+splitLine[1]] = true
+			continue
+		}
+		// Check if there is a "replace" statement
+		if splitLineLen >= 3 {
+			if splitLine[2] == "=>" {
+				if splitLineLen == 5 {
+					mapOfDeps[splitLine[3]+"@"+splitLine[4]] = true
+					continue
+				} else {
+					mapOfDeps[splitLine[3]] = true
+				}
+			}
 		}
 	}
 	return mapOfDeps
