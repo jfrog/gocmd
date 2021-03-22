@@ -143,35 +143,26 @@ func GetFileDetails(filePath string) (modFileContent []byte, modFileStat os.File
 func outputToMap(output string) map[string]bool {
 	lineOutput := strings.Split(output, "\n")
 	mapOfDeps := map[string]bool{}
-	lines := len(lineOutput)
-	i := 0
-	// Ignore all 'go' messages
-	for ; i < lines; i++ {
-		splitLine := strings.Split(lineOutput[i], " ")
-		if splitLine[0] != "go:" {
-			break
-		}
-	}
-	// First dependency in the list  is the module itself
-	i++
-	for ; i < lines; i++ {
-		splitLine := strings.Split(lineOutput[i], " ")
-		splitLineLen := len(splitLine)
-		if splitLineLen == 2 {
+
+	for _, line := range lineOutput {
+		splitLine := strings.Split(line, " ")
+		lineLen := len(splitLine)
+		if lineLen == 2 {
 			mapOfDeps[splitLine[0]+"@"+splitLine[1]] = true
 			continue
 		}
-		// Check if there is a "replace" statement
-		if splitLineLen >= 3 {
-			if splitLine[2] == "=>" {
-				if splitLineLen == 5 {
-					mapOfDeps[splitLine[3]+"@"+splitLine[4]] = true
-					continue
-				} else {
-					mapOfDeps[splitLine[3]] = true
-				}
-			}
+		// In a case of a replace statement : source version => target version
+		// choose the target version.
+		if lineLen == 5 {
+			mapOfDeps[splitLine[3]+"@"+splitLine[4]] = true
+			continue
 		}
+		// In a case of a replace statement with a local filesystem target: source version => local_target
+		// local target won't be added to the dependencies map.
+		if lineLen == 4 && splitLine[0] != "go:" {
+			log.Debug("Using replace statement to a local filesystem target: " + splitLine[0] + ",\nthis dependency won't be added to the requested build dependencies list.")
+		}
+
 	}
 	return mapOfDeps
 }

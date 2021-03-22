@@ -118,7 +118,7 @@ func DownloadDependency(dependencyName string) error {
 	return errorutils.CheckError(gofrogcmd.RunCmd(goCmd))
 }
 
-// Runs go mod graph command and returns slice of the dependencies
+// Runs 'go list -m all' command and returns map of the dependencies in the build list
 func GetDependenciesGraph(projectDir string) (map[string]bool, error) {
 	var err error
 	if projectDir == "" {
@@ -129,7 +129,7 @@ func GetDependenciesGraph(projectDir string) (map[string]bool, error) {
 	}
 
 	// Read and store the details of the go.mod and go.sum files,
-	// because they may change by the "go mod graph" command.
+	// because they may change by the "go list" command.
 	modFileContent, modFileStat, err := GetFileDetails(filepath.Join(projectDir, "go.mod"))
 	if err != nil {
 		log.Info("Dependencies were not collected for this build, since go.mod could not be found in", projectDir)
@@ -140,7 +140,7 @@ func GetDependenciesGraph(projectDir string) (map[string]bool, error) {
 		defer RestoreSumFile(projectDir, sumFileContent, sumFileStat)
 	}
 
-	log.Info("Running 'go mod graph' in", projectDir)
+	log.Info("Running 'go list -m all' in", projectDir)
 	goCmd, err := NewCmd()
 	if err != nil {
 		return nil, err
@@ -175,7 +175,7 @@ func GetDependenciesGraph(projectDir string) (map[string]bool, error) {
 	}
 
 	// Restore the the go.mod and go.sum files, to make sure they stay the same as before
-	// running the "go mod graph" command.
+	// running the "go list" command.
 	err = ioutil.WriteFile(filepath.Join(projectDir, "go.mod"), modFileContent, modFileStat.Mode())
 	if err != nil {
 		return nil, err
