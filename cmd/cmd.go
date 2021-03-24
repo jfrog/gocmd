@@ -118,7 +118,7 @@ func DownloadDependency(dependencyName string) error {
 	return errorutils.CheckError(gofrogcmd.RunCmd(goCmd))
 }
 
-// Runs 'go list -m all' command and returns map of the dependencies in the build list
+// Runs 'go list -m all' command and returns map of the dependencies
 func GetDependenciesList(projectDir string) (map[string]bool, error) {
 	var err error
 	if projectDir == "" {
