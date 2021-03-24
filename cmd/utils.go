@@ -163,7 +163,7 @@ func outputToMap(output string) map[string]bool {
 		// local target won't be added to the dependencies map.
 		if lineLen == 4 && splitLine[0] != "go:" {
 			if splitLine[2] == "=>" {
-				log.Debug("The replacer is not pointing to a VCS version: " + splitLine[0] + ",\nThis dependency won't be added to the requested build dependencies list.")
+				log.Error("The replacer is not pointing to a VCS version: " + splitLine[0] + ",\nThis dependency won't be added to the requested build dependencies list.")
 			}
 		}
 

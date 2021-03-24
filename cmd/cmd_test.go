@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"github.com/jfrog/jfrog-client-go/utils/log"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -31,6 +32,7 @@ rsc.io/quote v1.5.2
 rsc.io/sampler v1.3.0
 	`
 
+	log.SetLogger(log.NewLogger(log.ERROR, nil))
 	actual := outputToMap(content)
 	expected := map[string]bool{
 		"github.com/dsnet/compress@v0.0.0-20171208185109-cc9eb1d7ad76":    true,
@@ -40,9 +42,8 @@ rsc.io/sampler v1.3.0
 		"github.com/pierrec/lz4@v2.0.5+incompatible":                      true,
 		"github.com/ulikunitz/xz@v0.5.4":                                  true,
 		"golang.org/x/text@v0.3.1-0.20180807135948-17ff2d5776d2":          true,
-		"/temp/tools":           true,
-		"rsc.io/quote@v1.5.2":   true,
-		"rsc.io/sampler@v1.3.0": true,
+		"rsc.io/quote@v1.5.2":                                             true,
+		"rsc.io/sampler@v1.3.0":                                           true,
 	}
 
 	if !reflect.DeepEqual(expected, actual) {
