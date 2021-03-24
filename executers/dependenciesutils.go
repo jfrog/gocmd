@@ -115,7 +115,7 @@ func populateAndPublish(targetRepo, cachePath string, dependenciesInterface GoPa
 
 // Collects the dependencies of the project
 func collectProjectDependencies(targetRepo, rootProjectDir string, cache *cache.DependenciesCache, auth auth.ServiceDetails) (map[string]bool, error) {
-	dependenciesMap, err := getDependenciesGraphWithFallback(targetRepo, auth)
+	dependenciesMap, err := getDependenciesListWithFallback(targetRepo, auth)
 	if err != nil {
 		return nil, err
 	}
@@ -378,8 +378,8 @@ func getPackagePathIfExists(cachePath, dependencyName, version string) (zipPath 
 	return zipPath, nil
 }
 
-// Runs go mod graph command with fallback.
-func getDependenciesGraphWithFallback(targetRepo string, auth auth.ServiceDetails) (map[string]bool, error) {
+// Runs 'go list -m all' command with fallback.
+func getDependenciesListWithFallback(targetRepo string, auth auth.ServiceDetails) (map[string]bool, error) {
 	dependenciesMap := map[string]bool{}
 	modulesWithErrors := map[string]previousTries{}
 	usedProxy := true
@@ -392,7 +392,7 @@ func getDependenciesGraphWithFallback(targetRepo string, auth auth.ServiceDetail
 		}
 
 		usedProxy = !usedProxy
-		dependenciesMap, err = cmd.GetDependenciesGraph("")
+		dependenciesMap, err = cmd.GetDependenciesList("")
 		if err == nil {
 			break
 		}
@@ -463,11 +463,6 @@ func removeGoSum(path string) error {
 		}
 	}
 	return nil
-}
-
-func runGoModGraph() (output map[string]bool, err error) {
-	// Running go mod graph command
-	return cmd.GetDependenciesGraph("")
 }
 
 type previousTries struct {

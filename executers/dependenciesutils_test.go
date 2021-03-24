@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
@@ -121,12 +122,11 @@ func TestGetModPath(t *testing.T) {
 		modContent: []byte(modContent),
 		zipPath:    filepath.Join(cachePath, "v1.2.3.zip"),
 	}
-	pwd := PackageWithDeps{Dependency: &dep, depsTempDir: tempDirPath}
 	err = createDependencyInTemp(dep.GetZipPath(), tempDirPath)
 	if err != nil {
 		t.Error(err)
 	}
-	modPath := pwd.getModPathInTemp(tempDirPath)
+	modPath := getModPathInTemp(dep.id, tempDirPath)
 	path := filepath.Join(tempDirPath, "github.com", "test@v1.2.3", "go.mod")
 	if path != modPath {
 		t.Error(fmt.Sprintf("Expected %s, got %s", path, modPath))
@@ -136,6 +136,18 @@ func TestGetModPath(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+}
+
+func getModPathInTemp(moduleId, tempDir string) string {
+	moduleInfo := strings.Split(moduleId, ":")
+	moduleInfo[0] = goModDecode(moduleInfo[0])
+	if len(moduleInfo) > 1 {
+		moduleInfo[1] = goModDecode(moduleInfo[1])
+	}
+	moduleId = strings.Join(moduleInfo, ":")
+	modulePath := strings.Replace(moduleId, ":", "@", 1)
+	path := filepath.Join(tempDir, modulePath, "go.mod")
+	return path
 }
 
 func getBaseDir() (baseDir string, err error) {

@@ -119,7 +119,7 @@ func DownloadDependency(dependencyName string) error {
 }
 
 // Runs 'go list -m all' command and returns map of the dependencies in the build list
-func GetDependenciesGraph(projectDir string) (map[string]bool, error) {
+func GetDependenciesList(projectDir string) (map[string]bool, error) {
 	var err error
 	if projectDir == "" {
 		projectDir, err = GetProjectRoot()

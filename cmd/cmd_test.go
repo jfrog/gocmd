@@ -119,3 +119,27 @@ func TestGetProjectDir(t *testing.T) {
 		t.Error("Expecting a different value than", root)
 	}
 }
+
+func TestGetDependenciesList(t *testing.T) {
+	log.SetLogger(log.NewLogger(log.ERROR, nil))
+	os.Rename(filepath.Join("testdata", "mods", "testGoList", "go.mod.txt"), filepath.Join("testdata", "mods", "testGoList", "go.mod"))
+	os.Rename(filepath.Join("testdata", "mods", "testGoList", "go.sum.txt"), filepath.Join("testdata", "mods", "testGoList", "go.sum"))
+
+	actual, err := GetDependenciesList(filepath.Join("testdata", "mods", "testGoList"))
+	if err != nil {
+		t.Error(err)
+	}
+
+	os.Rename(filepath.Join("testdata", "mods", "testGoList", "go.mod"), filepath.Join("testdata", "mods", "testGoList", "go.mod.txt"))
+	os.Rename(filepath.Join("testdata", "mods", "testGoList", "go.sum"), filepath.Join("testdata", "mods", "testGoList", "go.sum.txt"))
+
+	expected := map[string]bool{
+		"golang.org/x/text@v0.3.3":                              true,
+		"golang.org/x/tools@v0.0.0-20180917221912-90fa682c2a6e": true,
+		"rsc.io/quote@v1.5.2":                                   true,
+		"rsc.io/sampler@v1.3.0":                                 true,
+	}
+	if !reflect.DeepEqual(expected, actual) {
+		t.Errorf("Expecting: \n%v \nGot: \n%v", expected, actual)
+	}
+}
