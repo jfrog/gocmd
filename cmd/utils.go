@@ -154,13 +154,17 @@ func outputToMap(output string) map[string]bool {
 		// In a case of a replace statement : source version => target version
 		// choose the target version.
 		if lineLen == 5 {
-			mapOfDeps[splitLine[3]+"@"+splitLine[4]] = true
-			continue
+			if splitLine[2] == "=>" {
+				mapOfDeps[splitLine[3]+"@"+splitLine[4]] = true
+				continue
+			}
 		}
 		// In a case of a replace statement with a local filesystem target: source version => local_target
 		// local target won't be added to the dependencies map.
 		if lineLen == 4 && splitLine[0] != "go:" {
-			log.Debug("Using replace statement to a local filesystem target: " + splitLine[0] + ",\nthis dependency won't be added to the requested build dependencies list.")
+			if splitLine[2] == "=>" {
+				log.Debug("The replacer is not pointing to a VCS version: " + splitLine[0] + ",\nThis dependency won't be added to the requested build dependencies list.")
+			}
 		}
 
 	}
