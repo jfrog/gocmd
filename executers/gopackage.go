@@ -2,8 +2,11 @@ package executers
 
 import (
 	"fmt"
+	"path/filepath"
+	"strings"
 
 	"github.com/jfrog/gocmd/cache"
+	"github.com/jfrog/gocmd/executers/utils"
 	"github.com/jfrog/jfrog-client-go/artifactory"
 	"github.com/jfrog/jfrog-client-go/artifactory/buildinfo"
 	_go "github.com/jfrog/jfrog-client-go/artifactory/services/go"
@@ -27,6 +30,19 @@ type Package struct {
 	modPath               string
 	infoPath              string
 	version               string
+}
+
+// Represents go dependency when running with go-recursive-publish set to true.
+type PackageWithDeps struct {
+	Dependency             *Package
+	transitiveDependencies []PackageWithDeps
+	regExp                 *utils.RegExp
+	runGoModCommand        bool
+	shouldRevertToEmptyMod bool
+	cachePath              string
+	GoModEditMessage       string
+	originalModContent     []byte
+	depsTempDir            string
 }
 
 func (dependencyPackage *Package) New(cachePath string, dep Package) GoPackage {
@@ -116,4 +132,17 @@ func (dependencyPackage *Package) CreateBuildInfoDependencies(includeInfoFiles b
 	zipDependency.Checksum = &buildinfo.Checksum{Sha1: fileDetails.Checksum.Sha1, Md5: fileDetails.Checksum.Md5}
 	dependencyPackage.buildInfoDependencies = append(dependencyPackage.buildInfoDependencies, zipDependency)
 	return nil
+}
+
+func (pwd *PackageWithDeps) getModPathInTemp(tempDir string) string {
+	moduleId := pwd.Dependency.GetId()
+	moduleInfo := strings.Split(moduleId, ":")
+	moduleInfo[0] = goModDecode(moduleInfo[0])
+	if len(moduleInfo) > 1 {
+		moduleInfo[1] = goModDecode(moduleInfo[1])
+	}
+	moduleId = strings.Join(moduleInfo, ":")
+	modulePath := strings.Replace(moduleId, ":", "@", 1)
+	path := filepath.Join(tempDir, modulePath, "go.mod")
+	return path
 }
