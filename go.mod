@@ -8,4 +8,4 @@ require (
 	github.com/pkg/errors v0.8.1
 )
 
-// replace github.com/jfrog/jfrog-client-go => github.com/jfrog/jfrog-client-go dev
+replace github.com/jfrog/jfrog-client-go => github.com/asafgabai/jfrog-client-go v0.18.1-0.20210329145744-6661183bb460

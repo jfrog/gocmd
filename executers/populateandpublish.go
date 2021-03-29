@@ -61,7 +61,6 @@ func (pwd *PackageWithDeps) New(cachePath string, dependency Package) GoPackage 
 func (pwd *PackageWithDeps) PopulateModAndPublish(targetRepo string, cache *cache.DependenciesCache, serviceManager artifactory.ArtifactoryServicesManager) error {
 	var path string
 	log.Debug("Starting to work on", pwd.Dependency.GetId())
-	serviceManager.GetConfig().GetServiceDetails()
 	dependenciesMap := cache.GetMap()
 	published, _ := dependenciesMap[pwd.Dependency.GetId()]
 	if published {

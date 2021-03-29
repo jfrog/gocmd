@@ -56,5 +56,5 @@ func createGoCentralServiceManager(url string) (artifactory.ArtifactoryServicesM
 	if err != nil {
 		return nil, err
 	}
-	return artifactory.New(&artifactoryDetails, serviceConfig)
+	return artifactory.New(serviceConfig)
 }
