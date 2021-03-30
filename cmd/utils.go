@@ -178,15 +178,15 @@ func outputToMap(output string) map[string]bool {
 // Go performs password redaction from url since version 1.13.
 // Only if go version before 1.13, should manually perform password masking.
 func shouldMaskPassword() (bool, error) {
-	return compareVersions(shouldMask, minGoVersionForMasking)
+	return compareSpecificVersionToCurVersion(shouldMask, minGoVersionForMasking)
 }
 
 // From version 1.16 and above build commands like go build and go list no longer modify go.mod and go.sum by default.
 func automaticallyModifyMod() (bool, error) {
-	return compareVersions(autoModify, maxGoVersionAutomaticallyModifyMod)
+	return compareSpecificVersionToCurVersion(autoModify, maxGoVersionAutomaticallyModifyMod)
 }
 
-func compareVersions(result *bool, comparedVersion string) (bool, error) {
+func compareSpecificVersionToCurVersion(result *bool, comparedVersion string) (bool, error) {
 	if result == nil {
 		goVersion, err := getParsedGoVersion()
 		if err != nil {
