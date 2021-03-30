@@ -1,9 +1,9 @@
 image:
-  - Visual Studio 2017
+  - Visual Studio 2019
 
 build: off
 skip_tags: true
-stack: go 1.12
+stack: go 1.16
 clone_folder: c:\gopath\src\github.com\jfrog\gocmd
 environment:
   GOPATH: c:\gopath
