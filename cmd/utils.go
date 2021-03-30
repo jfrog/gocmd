@@ -17,10 +17,14 @@ import (
 )
 
 // Minimum go version, which its output does not require to mask passwords in URLs.
-const minimumGoVersion = "go1.13"
+const minGoVersionForMasking = "go1.13"
+const maxGoVersionAutomaticallyModifyMod = "go1.15"
 
 // Never use this value, use shouldMaskPassword().
 var shouldMask *bool = nil
+
+// Never use this value, use automaticallyModifyMod().
+var autoModify *bool = nil
 
 func prepareRegExp() error {
 	err := prepareGlobalRegExp()
@@ -163,7 +167,7 @@ func outputToMap(output string) map[string]bool {
 		// local target won't be added to the dependencies map.
 		if lineLen == 4 && splitLine[0] != "go:" {
 			if splitLine[2] == "=>" {
-				log.Error("The replacer is not pointing to a VCS version: " + splitLine[0] + ",\nThis dependency won't be added to the requested build dependencies list.")
+				log.Info("The replacer is not pointing to a VCS version: " + splitLine[0] + ",\nThis dependency won't be added to the requested build dependencies list.")
 			}
 		}
 
@@ -179,7 +183,7 @@ func shouldMaskPassword() (bool, error) {
 		if err != nil {
 			return false, err
 		}
-		shouldMaskBool := !goVersion.AtLeast(minimumGoVersion)
+		shouldMaskBool := !goVersion.AtLeast(minGoVersionForMasking)
 		shouldMask = &shouldMaskBool
 	}
 
@@ -195,4 +199,18 @@ func getParsedGoVersion() (*version.Version, error) {
 	// Thus should take the third element.
 	splitOutput := strings.Split(output, " ")
 	return version.NewVersion(splitOutput[2]), nil
+}
+
+// From version 1.16 and above build commands like go build and go list no longer modify go.mod and go.sum by default.
+func automaticallyModifyMod() (bool, error) {
+	if autoModify == nil {
+		goVersion, err := getParsedGoVersion()
+		if err != nil {
+			return false, err
+		}
+		autoModifyBool := !goVersion.AtLeast(maxGoVersionAutomaticallyModifyMod)
+		autoModify = &autoModifyBool
+	}
+
+	return *autoModify, nil
 }
