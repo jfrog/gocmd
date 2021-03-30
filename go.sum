@@ -4,8 +4,8 @@ github.com/andybalholm/brotli v1.0.0 h1:7UCwP93aiSfvWpapti8g88vVVGp2qqtGyePsSuDa
 github.com/andybalholm/brotli v1.0.0/go.mod h1:loMXtMfwqflxFJPmdbJO0a3KNoPuLBgiu3qAvBg8x/Y=
 github.com/anmitsu/go-shlex v0.0.0-20161002113705-648efa622239 h1:kFOfPq6dUM1hTo4JG6LR5AXSUEsOjtdm0kw0FtQtMJA=
 github.com/anmitsu/go-shlex v0.0.0-20161002113705-648efa622239/go.mod h1:2FmKhYUyUczH0OGQWaF5ceTx0UBShxjsH6f8oGKYe2c=
-github.com/asafgabai/jfrog-client-go v0.18.1-0.20210329145744-6661183bb460 h1:xjwcGA1qj9dNAdqjDJNgaBXPknASm7vSXzXkZ39TUMM=
-github.com/asafgabai/jfrog-client-go v0.18.1-0.20210329145744-6661183bb460/go.mod h1:0RYDrQKCIdJbx6pjopwtwXh4/PaEW9FqFc4b4ox8fl0=
+github.com/asafgabai/jfrog-client-go v0.18.1-0.20210330074202-d1dbe7977d17 h1:CeJTvIlrxA0SD+IzsHnyiMCUtXPbkhHCGGLyj/M4feU=
+github.com/asafgabai/jfrog-client-go v0.18.1-0.20210330074202-d1dbe7977d17/go.mod h1:0RYDrQKCIdJbx6pjopwtwXh4/PaEW9FqFc4b4ox8fl0=
 github.com/buger/jsonparser v0.0.0-20180910192245-6acdf747ae99/go.mod h1:bbYlZJ7hK1yFx9hf58LP0zeX7UjIGs20ufpu3evjr+s=
 github.com/davecgh/go-spew v1.1.0 h1:ZDRjVQ15GmhC3fiQ8ni8+OwkZQO4DARzQgrnXU1Liz8=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
