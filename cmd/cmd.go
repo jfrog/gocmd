@@ -145,7 +145,7 @@ func GetDependenciesList(projectDir string) (map[string]bool, error) {
 	if err != nil {
 		return nil, err
 	}
-	goCmd.Command = []string{"list", "-m", "all"}
+	goCmd.Command = []string{"list", "-m", "-mod=mod", "all"}
 	goCmd.Dir = projectDir
 
 	err = prepareGlobalRegExp()

@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
 	"github.com/jfrog/jfrog-client-go/utils/log"
+	"github.com/stretchr/testify/assert"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -122,16 +124,23 @@ func TestGetProjectDir(t *testing.T) {
 
 func TestGetDependenciesList(t *testing.T) {
 	log.SetLogger(log.NewLogger(log.ERROR, nil))
-	os.Rename(filepath.Join("testdata", "mods", "testGoList", "go.mod.txt"), filepath.Join("testdata", "mods", "testGoList", "go.mod"))
-	os.Rename(filepath.Join("testdata", "mods", "testGoList", "go.sum.txt"), filepath.Join("testdata", "mods", "testGoList", "go.sum"))
+	gomodPath := filepath.Join("testdata", "mods", "testGoList")
+	err := fileutils.MoveFile(filepath.Join(gomodPath, "go.mod.txt"), filepath.Join(gomodPath, "go.mod"))
+	assert.NoError(t, err)
+	err = fileutils.MoveFile(filepath.Join(gomodPath, "go.sum.txt"), filepath.Join(gomodPath, "go.sum"))
+	assert.NoError(t, err)
 
-	actual, err := GetDependenciesList(filepath.Join("testdata", "mods", "testGoList"))
+	actual, err := GetDependenciesList(filepath.Join(gomodPath))
 	if err != nil {
 		t.Error(err)
 	}
 
-	os.Rename(filepath.Join("testdata", "mods", "testGoList", "go.mod"), filepath.Join("testdata", "mods", "testGoList", "go.mod.txt"))
-	os.Rename(filepath.Join("testdata", "mods", "testGoList", "go.sum"), filepath.Join("testdata", "mods", "testGoList", "go.sum.txt"))
+	defer func() {
+		err := fileutils.MoveFile(filepath.Join(gomodPath, "go.mod"), filepath.Join(gomodPath, "go.mod.txt"))
+		assert.NoError(t, err)
+		err = fileutils.MoveFile(filepath.Join(gomodPath, "go.sum"), filepath.Join(gomodPath, "go.sum.txt"))
+		assert.NoError(t, err)
+	}()
 
 	expected := map[string]bool{
 		"golang.org/x/text@v0.3.3":                              true,
