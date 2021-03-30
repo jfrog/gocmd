@@ -3,7 +3,7 @@ image:
 
 build: off
 skip_tags: true
-#stack: go 1.12
+stack: go 1.12
 clone_folder: c:\gopath\src\github.com\jfrog\gocmd
 environment:
   GOPATH: c:\gopath
