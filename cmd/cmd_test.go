@@ -1,6 +1,9 @@
 package cmd
 
 import (
+	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
+	"github.com/jfrog/jfrog-client-go/utils/log"
+	"github.com/stretchr/testify/assert"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -18,20 +21,20 @@ go: finding rsc.io/quote v1.5.2
 go: finding golang.org/x/tools v0.0.0-20181006002542-f60d9635b16a
 go: finding golang.org/x/text v0.3.1-0.20180807135948-17ff2d5776d2
 go: finding rsc.io/sampler v1.3.0
-go: finding golang.org/x/text v0.0.0-20170915032832-14c0d48ead0c
-github.com/you/hello github.com/dsnet/compress@v0.0.0-20171208185109-cc9eb1d7ad76
-github.com/you/hello github.com/golang/snappy@v0.0.0-20180518054509-2e65f85255db
-github.com/you/hello github.com/mholt/archiver@v2.1.0+incompatible
-github.com/you/hello github.com/nwaples/rardecode@v0.0.0-20171029023500-e06696f847ae
-github.com/you/hello github.com/pierrec/lz4@v2.0.5+incompatible
-github.com/you/hello github.com/ulikunitz/xz@v0.5.4
-github.com/you/hello golang.org/x/text@v0.3.1-0.20180807135948-17ff2d5776d2
-github.com/you/hello golang.org/x/tools@v0.0.0-20181006002542-f60d9635b16a
-github.com/you/hello rsc.io/quote@v1.5.2
-rsc.io/quote@v1.5.2 rsc.io/sampler@v1.3.0
-rsc.io/sampler@v1.3.0 golang.org/x/text@v0.0.0-20170915032832-14c0d48ead0c
+github.com/you/hello
+github.com/dsnet/compress v0.0.0-20171208185109-cc9eb1d7ad76
+github.com/golang/snappy v0.0.0-20180518054509-2e65f85255db
+github.com/mholt/archiver v2.1.0+incompatible
+github.com/nwaples/rardecode v0.0.0-20171029023500-e06696f847ae
+github.com/pierrec/lz4 v2.0.5+incompatible
+github.com/ulikunitz/xz v0.5.4
+golang.org/x/text v0.0.0-20170915032832-14c0d48ead0c => golang.org/x/text v0.3.1-0.20180807135948-17ff2d5776d2
+golang.org/x/tools v0.0.0-20181006002542-f60d9635b16a => /temp/tools
+rsc.io/quote v1.5.2
+rsc.io/sampler v1.3.0
 	`
 
+	log.SetLogger(log.NewLogger(log.ERROR, nil))
 	actual := outputToMap(content)
 	expected := map[string]bool{
 		"github.com/dsnet/compress@v0.0.0-20171208185109-cc9eb1d7ad76":    true,
@@ -41,10 +44,8 @@ rsc.io/sampler@v1.3.0 golang.org/x/text@v0.0.0-20170915032832-14c0d48ead0c
 		"github.com/pierrec/lz4@v2.0.5+incompatible":                      true,
 		"github.com/ulikunitz/xz@v0.5.4":                                  true,
 		"golang.org/x/text@v0.3.1-0.20180807135948-17ff2d5776d2":          true,
-		"golang.org/x/tools@v0.0.0-20181006002542-f60d9635b16a":           true,
 		"rsc.io/quote@v1.5.2":                                             true,
 		"rsc.io/sampler@v1.3.0":                                           true,
-		"golang.org/x/text@v0.0.0-20170915032832-14c0d48ead0c":            true,
 	}
 
 	if !reflect.DeepEqual(expected, actual) {
@@ -118,5 +119,45 @@ func TestGetProjectDir(t *testing.T) {
 	}
 	if root == projectRoot {
 		t.Error("Expecting a different value than", root)
+	}
+}
+
+func TestGetDependenciesList(t *testing.T) {
+	log.SetLogger(log.NewLogger(log.ERROR, nil))
+	gomodPath := filepath.Join("testdata", "mods", "testGoList")
+	err := fileutils.MoveFile(filepath.Join(gomodPath, "go.mod.txt"), filepath.Join(gomodPath, "go.mod"))
+	assert.NoError(t, err)
+	defer func() {
+		err := fileutils.MoveFile(filepath.Join(gomodPath, "go.mod"), filepath.Join(gomodPath, "go.mod.txt"))
+		assert.NoError(t, err)
+	}()
+	err = fileutils.MoveFile(filepath.Join(gomodPath, "go.sum.txt"), filepath.Join(gomodPath, "go.sum"))
+	assert.NoError(t, err)
+	defer func() {
+		err = fileutils.MoveFile(filepath.Join(gomodPath, "go.sum"), filepath.Join(gomodPath, "go.sum.txt"))
+		assert.NoError(t, err)
+	}()
+	originSumFileContent, _, err := GetGoSum(gomodPath)
+
+	actual, err := GetDependenciesList(filepath.Join(gomodPath))
+	if err != nil {
+		t.Error(err)
+	}
+
+	// Since Go 1.16 'go list' command won't automatically update go.mod and go.sum.
+	// Check that we rollback changes properly.
+	newSumFileContent, _, err := GetGoSum(gomodPath)
+	if !reflect.DeepEqual(originSumFileContent, newSumFileContent) {
+		t.Errorf("go.sum has been modified and didn't rollback properly")
+	}
+
+	expected := map[string]bool{
+		"golang.org/x/text@v0.3.3":                              true,
+		"golang.org/x/tools@v0.0.0-20180917221912-90fa682c2a6e": true,
+		"rsc.io/quote@v1.5.2":                                   true,
+		"rsc.io/sampler@v1.3.0":                                 true,
+	}
+	if !reflect.DeepEqual(expected, actual) {
+		t.Errorf("Expecting: \n%v \nGot: \n%v", expected, actual)
 	}
 }

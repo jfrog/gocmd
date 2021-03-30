@@ -142,14 +142,31 @@ func GetFileDetails(filePath string) (modFileContent []byte, modFileStat os.File
 
 func outputToMap(output string) map[string]bool {
 	lineOutput := strings.Split(output, "\n")
-	var result []string
 	mapOfDeps := map[string]bool{}
+
 	for _, line := range lineOutput {
 		splitLine := strings.Split(line, " ")
-		if len(splitLine) == 2 {
-			mapOfDeps[splitLine[1]] = true
-			result = append(result, splitLine[1])
+		lineLen := len(splitLine)
+		if lineLen == 2 {
+			mapOfDeps[splitLine[0]+"@"+splitLine[1]] = true
+			continue
 		}
+		// In a case of a replace statement : source version => target version
+		// choose the target version.
+		if lineLen == 5 {
+			if splitLine[2] == "=>" {
+				mapOfDeps[splitLine[3]+"@"+splitLine[4]] = true
+				continue
+			}
+		}
+		// In a case of a replace statement with a local filesystem target: source version => local_target
+		// local target won't be added to the dependencies map.
+		if lineLen == 4 && splitLine[0] != "go:" {
+			if splitLine[2] == "=>" {
+				log.Error("The replacer is not pointing to a VCS version: " + splitLine[0] + ",\nThis dependency won't be added to the requested build dependencies list.")
+			}
+		}
+
 	}
 	return mapOfDeps
 }

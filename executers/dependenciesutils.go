@@ -17,7 +17,6 @@ import (
 	"github.com/jfrog/jfrog-client-go/artifactory"
 	"github.com/jfrog/jfrog-client-go/auth"
 	"github.com/jfrog/jfrog-client-go/http/httpclient"
-	clientutils "github.com/jfrog/jfrog-client-go/utils"
 	"github.com/jfrog/jfrog-client-go/utils/errorutils"
 	multifilereader "github.com/jfrog/jfrog-client-go/utils/io"
 	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
@@ -116,17 +115,11 @@ func populateAndPublish(targetRepo, cachePath string, dependenciesInterface GoPa
 
 // Collects the dependencies of the project
 func collectProjectDependencies(targetRepo, rootProjectDir string, cache *cache.DependenciesCache, auth auth.ServiceDetails) (map[string]bool, error) {
-	dependenciesMap, err := getDependenciesGraphWithFallback(targetRepo, auth)
-	if err != nil {
-		return nil, err
-	}
-	replaceDependencies, err := getReplaceDependencies()
+	dependenciesMap, err := getDependenciesListWithFallback(targetRepo, auth)
 	if err != nil {
 		return nil, err
 	}
 
-	// Merge replaceDependencies with dependenciesToPublish
-	mergeReplaceDependenciesWithGraphDependencies(replaceDependencies, dependenciesMap)
 	sumFileContent, sumFileStat, err := cmd.GetGoSum(rootProjectDir)
 	if err != nil {
 		return nil, err
@@ -141,14 +134,14 @@ func collectProjectDependencies(targetRepo, rootProjectDir string, cache *cache.
 	return projectDependencies, nil
 }
 
-func downloadDependencies(targetRepo string, cache *cache.DependenciesCache, depSlice map[string]bool, auth auth.ServiceDetails) (map[string]bool, error) {
+func downloadDependencies(targetRepo string, cache *cache.DependenciesCache, depMap map[string]bool, auth auth.ServiceDetails) (map[string]bool, error) {
 	client, err := httpclient.ClientBuilder().Build()
 	if err != nil {
 		return nil, err
 	}
 	cacheDependenciesMap := cache.GetMap()
 	dependenciesMap := map[string]bool{}
-	for module := range depSlice {
+	for module := range depMap {
 		nameAndVersion := strings.Split(module, "@")
 		resp, err := performHeadRequest(auth, client, targetRepo, nameAndVersion[0], nameAndVersion[1])
 		if err != nil {
@@ -385,109 +378,8 @@ func getPackagePathIfExists(cachePath, dependencyName, version string) (zipPath 
 	return zipPath, nil
 }
 
-func mergeReplaceDependenciesWithGraphDependencies(replaceDeps []string, graphDeps map[string]bool) {
-	for _, replaceLine := range replaceDeps {
-		// Remove unnecessary spaces
-		replaceLine = strings.TrimSpace(replaceLine)
-		log.Debug("Working on the following replace line:", replaceLine)
-		// Split to get the right side that is the replace of the dependency
-		replaceDeps := strings.Split(replaceLine, "=>")
-		// Perform validation
-		if len(replaceDeps) < 2 {
-			log.Debug("The following replace line includes less then two elements", replaceDeps)
-			continue
-		}
-		// Strip "replace" keyword if present and split module to replace to find name and version which is optional
-		moduleToReplaceInfo := strings.Split(strings.TrimSpace(strings.Replace(replaceDeps[0], "replace ", "", 1)), " ")
-		moduleNameToReplace := strings.TrimSpace(moduleToReplaceInfo[0])
-		var moduleVersionToReplace string
-		if len(moduleToReplaceInfo) > 1 {
-			moduleVersionToReplace = strings.TrimSpace(moduleToReplaceInfo[1])
-		}
-
-		replacesInfo := strings.TrimSpace(replaceDeps[1])
-		newDependency := strings.Split(replacesInfo, " ")
-		if len(newDependency) != 2 {
-			log.Debug("The replacer is not pointing to a VCS version", newDependency[0])
-			// For local replacement, only removal from the map is required as no extra deps need to be added for download
-			removeFromDepsGraph(graphDeps, moduleNameToReplace, moduleVersionToReplace)
-			continue
-		}
-
-		// Remove the dependencies from graph matching module to replace to avoid downloading deps which will never
-		// be used as they are replaced
-		removedCount := removeFromDepsGraph(graphDeps, moduleNameToReplace, moduleVersionToReplace)
-		// Only add the replacement dependency to the map if it is replacing at least one dependency
-		if removedCount > 0 {
-			graphDeps[newDependency[0]+"@"+newDependency[1]] = true
-		}
-	}
-}
-
-func removeFromDepsGraph(graphDeps map[string]bool, name, version string) (removedCount int) {
-	dependencyToRemove := name + "@" + version
-	log.Debug("Dependency to remove", dependencyToRemove)
-	if version != "" {
-		// If version is specifed, remove the exact match, i.e the module with a specific version
-		if _, exists := graphDeps[dependencyToRemove]; exists {
-			delete(graphDeps, dependencyToRemove)
-			removedCount++
-		}
-	} else {
-		// Otherwise remove any dependencies matching the module name, i.e any versions of the module
-		for k := range graphDeps {
-			if strings.HasPrefix(k, dependencyToRemove) {
-				delete(graphDeps, k)
-				removedCount++
-			}
-		}
-	}
-	return removedCount
-}
-
-func getReplaceDependencies() ([]string, error) {
-	rootDir, err := cmd.GetProjectRoot()
-	if err != nil {
-		return nil, err
-	}
-	modFilePath := filepath.Join(rootDir, "go.mod")
-	modFileContent, err := ioutil.ReadFile(modFilePath)
-	if err != nil {
-		return nil, err
-	}
-	return parseModForReplaceDependencies(string(modFileContent))
-}
-
-func parseModForReplaceDependencies(modFileContent string) ([]string, error) {
-	replaceLinerRegExp, err := clientutils.GetRegExp(`[^\s*]?replace (?:[\(\w\.@:%_\+-.~#?&]?.+)=>(?:[\(\w\.@:%_\+-.~#?&]?.+)`)
-	if err != nil {
-		return nil, err
-	}
-	replaceLinerDependencies := replaceLinerRegExp.FindAllString(modFileContent, -1)
-	replaceRegExp, err := clientutils.GetRegExp(`\s*replace\s*\(`)
-	if err != nil {
-		return replaceLinerDependencies, err
-	}
-	replaceDependencies := replaceRegExp.FindAllString(modFileContent, -1)
-	if len(replaceDependencies) > 0 {
-		log.Debug("Found replace block...")
-		replacePosition := strings.Index(modFileContent, replaceDependencies[0])
-		lines := strings.Split(modFileContent[replacePosition+len(replaceDependencies[0]):], "\n")
-		for _, line := range lines {
-			if line == ")" {
-				break
-			}
-			if line == "" || line == "\n" {
-				continue
-			}
-			replaceLinerDependencies = append(replaceLinerDependencies, line)
-		}
-	}
-	return replaceLinerDependencies, nil
-}
-
-// Runs go mod graph command with fallback.
-func getDependenciesGraphWithFallback(targetRepo string, auth auth.ServiceDetails) (map[string]bool, error) {
+// Runs 'go list -m all' command with fallback.
+func getDependenciesListWithFallback(targetRepo string, auth auth.ServiceDetails) (map[string]bool, error) {
 	dependenciesMap := map[string]bool{}
 	modulesWithErrors := map[string]previousTries{}
 	usedProxy := true
@@ -500,7 +392,7 @@ func getDependenciesGraphWithFallback(targetRepo string, auth auth.ServiceDetail
 		}
 
 		usedProxy = !usedProxy
-		dependenciesMap, err = cmd.GetDependenciesGraph("")
+		dependenciesMap, err = cmd.GetDependenciesList("")
 		if err == nil {
 			break
 		}
@@ -571,11 +463,6 @@ func removeGoSum(path string) error {
 		}
 	}
 	return nil
-}
-
-func runGoModGraph() (output map[string]bool, err error) {
-	// Running go mod graph command
-	return cmd.GetDependenciesGraph("")
 }
 
 type previousTries struct {
