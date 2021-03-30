@@ -178,18 +178,26 @@ func outputToMap(output string) map[string]bool {
 // Go performs password redaction from url since version 1.13.
 // Only if go version before 1.13, should manually perform password masking.
 func shouldMaskPassword() (bool, error) {
-	if shouldMask == nil {
+	return compareVersions(shouldMask, minGoVersionForMasking)
+}
+
+// From version 1.16 and above build commands like go build and go list no longer modify go.mod and go.sum by default.
+func automaticallyModifyMod() (bool, error) {
+	return compareVersions(autoModify, maxGoVersionAutomaticallyModifyMod)
+}
+
+func compareVersions(result *bool, comparedVersion string) (bool, error) {
+	if result == nil {
 		goVersion, err := getParsedGoVersion()
 		if err != nil {
 			return false, err
 		}
-		shouldMaskBool := !goVersion.AtLeast(minGoVersionForMasking)
-		shouldMask = &shouldMaskBool
+		autoModifyBool := !goVersion.AtLeast(comparedVersion)
+		result = &autoModifyBool
 	}
 
-	return *shouldMask, nil
+	return *result, nil
 }
-
 func getParsedGoVersion() (*version.Version, error) {
 	output, err := GetGoVersion()
 	if err != nil {
@@ -199,18 +207,4 @@ func getParsedGoVersion() (*version.Version, error) {
 	// Thus should take the third element.
 	splitOutput := strings.Split(output, " ")
 	return version.NewVersion(splitOutput[2]), nil
-}
-
-// From version 1.16 and above build commands like go build and go list no longer modify go.mod and go.sum by default.
-func automaticallyModifyMod() (bool, error) {
-	if autoModify == nil {
-		goVersion, err := getParsedGoVersion()
-		if err != nil {
-			return false, err
-		}
-		autoModifyBool := !goVersion.AtLeast(maxGoVersionAutomaticallyModifyMod)
-		autoModify = &autoModifyBool
-	}
-
-	return *autoModify, nil
 }
