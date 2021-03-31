@@ -17,10 +17,16 @@ import (
 )
 
 // Minimum go version, which its output does not require to mask passwords in URLs.
-const minimumGoVersion = "go1.13"
+const minGoVersionForMasking = "go1.13"
+
+// Max go version, which automatically modify go.mod and go.sum when executing build commands.
+const maxGoVersionAutomaticallyModifyMod = "go1.15"
 
 // Never use this value, use shouldMaskPassword().
 var shouldMask *bool = nil
+
+// Never use this value, use automaticallyModifyMod().
+var autoModify *bool = nil
 
 func prepareRegExp() error {
 	err := prepareGlobalRegExp()
@@ -163,7 +169,7 @@ func outputToMap(output string) map[string]bool {
 		// local target won't be added to the dependencies map.
 		if lineLen == 4 && splitLine[0] != "go:" {
 			if splitLine[2] == "=>" {
-				log.Error("The replacer is not pointing to a VCS version: " + splitLine[0] + ",\nThis dependency won't be added to the requested build dependencies list.")
+				log.Info("The replacer is not pointing to a VCS version: " + splitLine[0] + ",\nThis dependency won't be added to the requested build dependencies list.")
 			}
 		}
 
@@ -174,16 +180,25 @@ func outputToMap(output string) map[string]bool {
 // Go performs password redaction from url since version 1.13.
 // Only if go version before 1.13, should manually perform password masking.
 func shouldMaskPassword() (bool, error) {
-	if shouldMask == nil {
+	return compareSpecificVersionToCurVersion(shouldMask, minGoVersionForMasking)
+}
+
+// Since version go1.16 build commands (like go build and go list) no longer modify go.mod and go.sum by default.
+func automaticallyModifyMod() (bool, error) {
+	return compareSpecificVersionToCurVersion(autoModify, maxGoVersionAutomaticallyModifyMod)
+}
+
+func compareSpecificVersionToCurVersion(result *bool, comparedVersion string) (bool, error) {
+	if result == nil {
 		goVersion, err := getParsedGoVersion()
 		if err != nil {
 			return false, err
 		}
-		shouldMaskBool := !goVersion.AtLeast(minimumGoVersion)
-		shouldMask = &shouldMaskBool
+		autoModifyBool := !goVersion.AtLeast(comparedVersion)
+		result = &autoModifyBool
 	}
 
-	return *shouldMask, nil
+	return *result, nil
 }
 
 func getParsedGoVersion() (*version.Version, error) {

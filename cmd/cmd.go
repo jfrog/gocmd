@@ -145,7 +145,16 @@ func GetDependenciesList(projectDir string) (map[string]bool, error) {
 	if err != nil {
 		return nil, err
 	}
-	goCmd.Command = []string{"list", "-m", "-mod=mod", "all"}
+	isAutoModify, err := automaticallyModifyMod()
+	if err != nil {
+		return nil, err
+	}
+	// Since version go1.16 build commands (like go build and go list) no longer modify go.mod and go.sum by default.
+	if isAutoModify {
+		goCmd.Command = []string{"list", "-m", "all"}
+	} else {
+		goCmd.Command = []string{"list", "-m", "-mod=mod", "all"}
+	}
 	goCmd.Dir = projectDir
 
 	err = prepareGlobalRegExp()
