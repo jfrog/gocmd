@@ -18,6 +18,8 @@ import (
 
 // Minimum go version, which its output does not require to mask passwords in URLs.
 const minGoVersionForMasking = "go1.13"
+
+// Max go version, which automatically modify go.mod and go.sum when executing build commands.
 const maxGoVersionAutomaticallyModifyMod = "go1.15"
 
 // Never use this value, use shouldMaskPassword().
@@ -181,7 +183,7 @@ func shouldMaskPassword() (bool, error) {
 	return compareSpecificVersionToCurVersion(shouldMask, minGoVersionForMasking)
 }
 
-// From version 1.16 and above build commands like go build and go list no longer modify go.mod and go.sum by default.
+// Since version go1.16 build commands (like go build and go list) no longer modify go.mod and go.sum by default.
 func automaticallyModifyMod() (bool, error) {
 	return compareSpecificVersionToCurVersion(autoModify, maxGoVersionAutomaticallyModifyMod)
 }
@@ -198,6 +200,7 @@ func compareSpecificVersionToCurVersion(result *bool, comparedVersion string) (b
 
 	return *result, nil
 }
+
 func getParsedGoVersion() (*version.Version, error) {
 	output, err := GetGoVersion()
 	if err != nil {

@@ -149,7 +149,7 @@ func GetDependenciesList(projectDir string) (map[string]bool, error) {
 	if err != nil {
 		return nil, err
 	}
-	// From version 1.16 and above build commands like go build and go list no longer modify go.mod and go.sum and flag '-mod=readonly' by default.
+	// Since version go1.16 build commands (like go build and go list) no longer modify go.mod and go.sum by default.
 	if isAutoModify {
 		goCmd.Command = []string{"list", "-m", "all"}
 	} else {
