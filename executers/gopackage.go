@@ -97,7 +97,8 @@ func (dependencyPackage *Package) Publish(summary string, targetRepo string, ser
 	params.ModuleId = dependencyPackage.id
 	params.ModPath = dependencyPackage.modPath
 	params.InfoPath = dependencyPackage.infoPath
-	return servicesManager.PublishGoProject(params)
+	_, err := servicesManager.PublishGoProject(params)
+	return err
 }
 
 func (dependencyPackage *Package) Dependencies() []buildinfo.Dependency {
