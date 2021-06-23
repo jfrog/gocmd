@@ -1,20 +1,25 @@
 package utils
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
-	"github.com/jfrog/gocmd/cache"
-	"github.com/jfrog/gocmd/cmd"
-	gofrogio "github.com/jfrog/gofrog/io"
-	"github.com/jfrog/jfrog-client-go/auth"
-	"github.com/jfrog/jfrog-client-go/utils"
-	"github.com/jfrog/jfrog-client-go/utils/errorutils"
-	"github.com/jfrog/jfrog-client-go/utils/log"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"strings"
+
+	"github.com/jfrog/gocmd/cache"
+	"github.com/jfrog/gocmd/cmd"
+	gofrogio "github.com/jfrog/gofrog/io"
+	"github.com/jfrog/jfrog-client-go/auth"
+	"github.com/jfrog/jfrog-client-go/http/httpclient"
+	"github.com/jfrog/jfrog-client-go/utils"
+	"github.com/jfrog/jfrog-client-go/utils/errorutils"
+	"github.com/jfrog/jfrog-client-go/utils/log"
 )
 
 const GOPROXY = "GOPROXY"
@@ -32,10 +37,19 @@ func DependencyNotFoundInArtifactory(err error, noRegistry bool) bool {
 	return false
 }
 
-func SetGoProxyWithApi(repoName string, details auth.CommonDetails) error {
+func SetGoProxyWithApi(repoName string, details auth.ServiceDetails) error {
+	url, err := GetArtifactoryApiUrl(repoName, details)
+	if err != nil {
+		return err
+	}
+	err = os.Setenv(GOPROXY, url)
+	return errorutils.CheckError(err)
+}
+
+func GetArtifactoryApiUrl(repoName string, details auth.ServiceDetails) (string, error) {
 	rtUrl, err := url.Parse(details.GetUrl())
 	if err != nil {
-		return errorutils.CheckError(err)
+		return "", errorutils.CheckError(err)
 	}
 
 	username := details.GetUser()
@@ -46,7 +60,7 @@ func SetGoProxyWithApi(repoName string, details auth.CommonDetails) error {
 		log.Debug("Using proxy with access-token.")
 		username, err = auth.ExtractUsernameFromAccessToken(details.GetAccessToken())
 		if err != nil {
-			return err
+			return "", err
 		}
 		password = details.GetAccessToken()
 	}
@@ -55,22 +69,62 @@ func SetGoProxyWithApi(repoName string, details auth.CommonDetails) error {
 		rtUrl.User = url.UserPassword(username, password)
 	}
 	rtUrl.Path += "api/go/" + repoName
-	err = os.Setenv(GOPROXY, rtUrl.String())
-	return errorutils.CheckError(err)
+	return rtUrl.String(), nil
 }
 
-func GetCachePath() (string, error) {
-	goPath, err := getGOPATH()
+// GetPackageVersion returns the matching version for the packageName string using the Artifactory details that are provided.
+// PackageName string should be in the following format: <Package Path>/@V/<Requested Branch Name>.info OR latest.info
+// For example the jfrog/jfrog-cli/@v/master.info packageName will return the corresponding canonical version (vX.Y.Z) string for the jfrog-cli master branch.
+func GetPackageVersion(repoName, packageName string, details auth.ServiceDetails) (string, error) {
+	artifactoryApiUrl, err := GetArtifactoryApiUrl(repoName, details)
+	if err != nil {
+		return "", err
+	}
+	artHttpDetails := details.CreateHttpClientDetails()
+	client, err := httpclient.ClientBuilder().Build()
+	if err != nil {
+		return "", err
+	}
+	artifactoryApiUrl = artifactoryApiUrl + "/" + packageName
+	resp, body, _, err := client.SendGet(artifactoryApiUrl, true, artHttpDetails)
+	if err != nil {
+		return "", err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return "", errorutils.CheckError(errors.New("Artifactory response: " + resp.Status))
+	}
+	// Extract version from response
+	var version PackageVersionResponseContent
+	err = json.Unmarshal(body, &version)
 	if err != nil {
 		return "", errorutils.CheckError(err)
 	}
-	return filepath.Join(goPath, "pkg", "mod", "cache", "download"), nil
+	return version.Version, nil
 }
 
+// GetCachePath returns the location of downloads dir insied the GOMODCACHE
+func GetCachePath() (string, error) {
+	goModCachePath, err := GetGoModCachePath()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(goModCachePath, "cache", "download"), nil
+}
+
+// GetGoModCachePath returns the location of the go module cache
+func GetGoModCachePath() (string, error) {
+	goPath, err := getGOPATH()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(goPath, "pkg", "mod"), nil
+}
+
+// GetGOPATH returns the location of the GOPATH
 func getGOPATH() (string, error) {
 	goCmd, err := cmd.NewCmd()
 	if err != nil {
-		return "", err
+		return "", errorutils.CheckError(err)
 	}
 	goCmd.Command = []string{"env", "GOPATH"}
 	output, err := gofrogio.RunCmdOutput(goCmd)
@@ -138,4 +192,8 @@ func parseGoPath(goPath string) string {
 	}
 	goPathSlice := strings.Split(goPath, ":")
 	return goPathSlice[0]
+}
+
+type PackageVersionResponseContent struct {
+	Version string `json:"Version,omitempty"`
 }

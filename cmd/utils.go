@@ -3,16 +3,30 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"strings"
+
 	gofrogio "github.com/jfrog/gofrog/io"
 	"github.com/jfrog/jfrog-client-go/utils"
 	"github.com/jfrog/jfrog-client-go/utils/errorutils"
 	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
 	"github.com/jfrog/jfrog-client-go/utils/log"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"strings"
+	"github.com/jfrog/jfrog-client-go/utils/version"
 )
+
+// Minimum go version, which its output does not require to mask passwords in URLs.
+const minGoVersionForMasking = "go1.13"
+
+// Max go version, which automatically modify go.mod and go.sum when executing build commands.
+const maxGoVersionAutomaticallyModifyMod = "go1.15"
+
+// Never use this value, use shouldMaskPassword().
+var shouldMask *bool = nil
+
+// Never use this value, use automaticallyModifyMod().
+var autoModify *bool = nil
 
 func prepareRegExp() error {
 	err := prepareGlobalRegExp()
@@ -27,7 +41,7 @@ func prepareGlobalRegExp() error {
 	var err error
 	if protocolRegExp == nil {
 		log.Debug("Initializing protocol regexp")
-		protocolRegExp, err = initRegExp(utils.CredentialsInUrlRegexp, MaskCredentials)
+		protocolRegExp, err = initRegExp(utils.CredentialsInUrlRegexp, RemoveCredentials)
 		if err != nil {
 			return err
 		}
@@ -88,9 +102,9 @@ func initRegExp(regex string, execFunc func(pattern *gofrogio.CmdOutputPattern) 
 	return outputPattern, nil
 }
 
-// Mask the credentials information from the line.
-func MaskCredentials(pattern *gofrogio.CmdOutputPattern) (string, error) {
-	return utils.MaskCredentials(pattern.Line, pattern.MatchedResults[0]), nil
+// Remove the credentials information from the line.
+func RemoveCredentials(pattern *gofrogio.CmdOutputPattern) (string, error) {
+	return utils.RemoveCredentials(pattern.Line, pattern.MatchedResults[0]), nil
 }
 
 func Error(pattern *gofrogio.CmdOutputPattern) (string, error) {
@@ -134,14 +148,66 @@ func GetFileDetails(filePath string) (modFileContent []byte, modFileStat os.File
 
 func outputToMap(output string) map[string]bool {
 	lineOutput := strings.Split(output, "\n")
-	var result []string
 	mapOfDeps := map[string]bool{}
+
 	for _, line := range lineOutput {
 		splitLine := strings.Split(line, " ")
-		if len(splitLine) == 2 {
-			mapOfDeps[splitLine[1]] = true
-			result = append(result, splitLine[1])
+		lineLen := len(splitLine)
+		if lineLen == 2 {
+			mapOfDeps[splitLine[0]+"@"+splitLine[1]] = true
+			continue
 		}
+		// In a case of a replace statement : source version => target version
+		// choose the target version.
+		if lineLen == 5 {
+			if splitLine[2] == "=>" {
+				mapOfDeps[splitLine[3]+"@"+splitLine[4]] = true
+				continue
+			}
+		}
+		// In a case of a replace statement with a local filesystem target: source version => local_target
+		// local target won't be added to the dependencies map.
+		if lineLen == 4 && splitLine[0] != "go:" {
+			if splitLine[2] == "=>" {
+				log.Info("The replacer is not pointing to a VCS version: " + splitLine[0] + ",\nThis dependency won't be added to the requested build dependencies list.")
+			}
+		}
+
 	}
 	return mapOfDeps
+}
+
+// Go performs password redaction from url since version 1.13.
+// Only if go version before 1.13, should manually perform password masking.
+func shouldMaskPassword() (bool, error) {
+	return compareSpecificVersionToCurVersion(shouldMask, minGoVersionForMasking)
+}
+
+// Since version go1.16 build commands (like go build and go list) no longer modify go.mod and go.sum by default.
+func automaticallyModifyMod() (bool, error) {
+	return compareSpecificVersionToCurVersion(autoModify, maxGoVersionAutomaticallyModifyMod)
+}
+
+func compareSpecificVersionToCurVersion(result *bool, comparedVersion string) (bool, error) {
+	if result == nil {
+		goVersion, err := getParsedGoVersion()
+		if err != nil {
+			return false, err
+		}
+		autoModifyBool := !goVersion.AtLeast(comparedVersion)
+		result = &autoModifyBool
+	}
+
+	return *result, nil
+}
+
+func getParsedGoVersion() (*version.Version, error) {
+	output, err := GetGoVersion()
+	if err != nil {
+		return nil, errorutils.CheckError(err)
+	}
+	// Go version output pattern is: 'go version go1.14.1 darwin/amd64'
+	// Thus should take the third element.
+	splitOutput := strings.Split(output, " ")
+	return version.NewVersion(splitOutput[2]), nil
 }

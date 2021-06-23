@@ -18,7 +18,7 @@ func RunWithFallbacksAndPublish(goArg []string, noRegistry, publishDeps bool, re
 		if resolver == nil || resolver.IsEmpty() {
 			return errorutils.CheckError(fmt.Errorf("Missing resolver information"))
 		}
-		artDetails := resolver.ServiceManager().GetConfig().GetCommonDetails()
+		artDetails := resolver.ServiceManager().GetConfig().GetServiceDetails()
 		err := utils.SetGoProxyWithApi(resolverDeployer.Resolver().Repo(), artDetails)
 		if err != nil {
 			return err
