@@ -86,7 +86,7 @@ func GetPackageVersion(repoName, packageName string, details auth.ServiceDetails
 		return "", err
 	}
 	artifactoryApiUrl = artifactoryApiUrl + "/" + packageName
-	resp, body, _, err := client.SendGet(artifactoryApiUrl, true, artHttpDetails)
+	resp, body, _, err := client.SendGet(artifactoryApiUrl, true, artHttpDetails, "")
 	if err != nil {
 		return "", err
 	}

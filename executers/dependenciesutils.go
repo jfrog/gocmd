@@ -167,7 +167,7 @@ func downloadDependencies(targetRepo string, cache *cache.DependenciesCache, dep
 
 func performHeadRequest(auth auth.ServiceDetails, client *httpclient.HttpClient, targetRepo, module, version string) (*http.Response, error) {
 	url := auth.GetUrl() + "api/go/" + targetRepo + "/" + module + "/@v/" + version + ".mod"
-	resp, _, err := client.SendHead(url, auth.CreateHttpClientDetails())
+	resp, _, err := client.SendHead(url, auth.CreateHttpClientDetails(), "")
 	if err != nil {
 		return nil, err
 	}
@@ -259,7 +259,7 @@ func downloadModFileFromArtifactoryToLocalCache(cachePath, targetRepo, name, ver
 			LocalPath:     pathToModuleCache,
 			LocalFileName: version + ".mod",
 		}
-		resp, err := client.DownloadFile(downloadFileDetails, "", auth.CreateHttpClientDetails(), 3, false)
+		resp, err := client.DownloadFile(downloadFileDetails, "", auth.CreateHttpClientDetails(), false)
 		if err != nil {
 			log.Error(fmt.Sprintf("Received an error %s downloading a file: %s to the local path: %s", err.Error(), downloadFileDetails.FileName, downloadFileDetails.LocalPath))
 			return ""
