@@ -25,13 +25,13 @@ import (
 const GOPROXY = "GOPROXY"
 
 // Returns true if a dependency was not found Artifactory.
-func DependencyNotFoundInArtifactory(err error, noRegistry bool) bool {
+func DependencyNotFoundInArtifactory(err error) bool {
 	regExp, errRegex := utils.GetRegExp(`^404( Not Found)?(\s)?:`)
 	if errRegex != nil {
 		LogError(errRegex)
 		return false
 	}
-	if !noRegistry && regExp.Match([]byte(err.Error())) {
+	if regExp.Match([]byte(err.Error())) {
 		return true
 	}
 	return false

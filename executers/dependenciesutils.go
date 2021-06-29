@@ -30,7 +30,7 @@ const (
 )
 
 // Resolve artifacts from VCS and publish the missing artifacts to Artifactory
-func collectDependenciesAndPublish(failOnError, publishDeps bool, dependenciesInterface GoPackage, resolverDeployer *params.ResolverDeployer) error {
+func collectDependenciesAndPublish(failOnError bool, dependenciesInterface GoPackage, resolverDeployer *params.ResolverDeployer) error {
 	rootProjectDir, err := cmd.GetProjectRoot()
 	if err != nil {
 		return err
@@ -41,31 +41,12 @@ func collectDependenciesAndPublish(failOnError, publishDeps bool, dependenciesIn
 	if err != nil || len(dependenciesToPublish) == 0 {
 		return err
 	}
-	cachePath, packageDependencies, err := getDependencies(dependenciesToPublish)
+	_, _, err = getDependencies(dependenciesToPublish)
 	if err != nil {
 		if failOnError {
 			return err
 		}
 		log.Error("Received an error retrieving project dependencies:", err)
-	}
-
-	// If need to publish the missing depedencies to Artifactory
-	if publishDeps {
-		// If we need publish the missing depedencies to an Artifactory server or repo, which are
-		// different then the resolution repo, then we have no information about which depedencies are actually
-		// missing and therefore should be published.
-		// Let's find out which depedencies are missing.
-		if !reflect.DeepEqual(resolverDeployer.Resolver(), resolverDeployer.Deployer()) {
-			err = findMissingDepedencies(&cache, dependenciesToPublish, resolverDeployer)
-			if err != nil {
-				return err
-			}
-		}
-		// Publish the missing dependencies to Artifactory.
-		err = populateAndPublish(resolverDeployer.Deployer().Repo(), cachePath, dependenciesInterface, packageDependencies, &cache, resolverDeployer.Deployer().ServiceManager())
-		if err != nil {
-			return err
-		}
 	}
 
 	utils.LogFinishedMsg(&cache)
