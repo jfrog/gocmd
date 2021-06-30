@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"os"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -23,28 +22,6 @@ import (
 )
 
 const GOPROXY = "GOPROXY"
-
-// Returns true if a dependency was not found Artifactory.
-func DependencyNotFoundInArtifactory(err error) bool {
-	regExp, errRegex := utils.GetRegExp(`^404( Not Found)?(\s)?:`)
-	if errRegex != nil {
-		LogError(errRegex)
-		return false
-	}
-	if regExp.Match([]byte(err.Error())) {
-		return true
-	}
-	return false
-}
-
-func SetGoProxyWithApi(repoName string, details auth.ServiceDetails) error {
-	url, err := GetArtifactoryApiUrl(repoName, details)
-	if err != nil {
-		return err
-	}
-	err = os.Setenv(GOPROXY, url)
-	return errorutils.CheckError(err)
-}
 
 func GetArtifactoryApiUrl(repoName string, details auth.ServiceDetails) (string, error) {
 	rtUrl, err := url.Parse(details.GetUrl())
