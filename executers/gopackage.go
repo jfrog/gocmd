@@ -106,7 +106,7 @@ func (dependencyPackage *Package) Dependencies() []buildinfo.Dependency {
 }
 
 // Adds the mod, zip and info files as build info dependencies
-func (dependencyPackage *Package) CreateBuildInfoDependencies(includeInfoFiles bool) error {
+func (dependencyPackage *Package) CreateBuildInfoDependencies() error {
 	// Zip file dependency for the build-info
 	zipDependency := buildinfo.Dependency{Id: dependencyPackage.id}
 	fileDetails, err := fileutils.GetFileDetails(dependencyPackage.zipPath)
