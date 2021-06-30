@@ -6,164 +6,22 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"unicode"
 
-	"github.com/jfrog/gocmd/cache"
-	"github.com/jfrog/gocmd/cmd"
 	"github.com/jfrog/gocmd/executers/utils"
-	"github.com/jfrog/gocmd/params"
-	"github.com/jfrog/jfrog-client-go/artifactory"
 	"github.com/jfrog/jfrog-client-go/auth"
 	"github.com/jfrog/jfrog-client-go/http/httpclient"
 	"github.com/jfrog/jfrog-client-go/utils/errorutils"
 	multifilereader "github.com/jfrog/jfrog-client-go/utils/io"
 	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
 	"github.com/jfrog/jfrog-client-go/utils/log"
-	"github.com/pkg/errors"
 )
 
 const (
 	FailedToRetrieve          = "Failed to retrieve"
 	FromBothArtifactoryAndVcs = "from both Artifactory and VCS"
 )
-
-// Resolve artifacts from VCS and publish the missing artifacts to Artifactory
-func collectDependenciesAndPublish(failOnError, publishDeps bool, dependenciesInterface GoPackage, resolverDeployer *params.ResolverDeployer) error {
-	rootProjectDir, err := cmd.GetProjectRoot()
-	if err != nil {
-		return err
-	}
-	cache := cache.DependenciesCache{}
-	// The collection of project dependencies requires the resolver information
-	dependenciesToPublish, err := collectProjectDependencies(resolverDeployer.Resolver().Repo(), rootProjectDir, &cache, resolverDeployer.Resolver().ServiceManager().GetConfig().GetServiceDetails())
-	if err != nil || len(dependenciesToPublish) == 0 {
-		return err
-	}
-	cachePath, packageDependencies, err := getDependencies(dependenciesToPublish)
-	if err != nil {
-		if failOnError {
-			return err
-		}
-		log.Error("Received an error retrieving project dependencies:", err)
-	}
-
-	// If need to publish the missing depedencies to Artifactory
-	if publishDeps {
-		// If we need publish the missing depedencies to an Artifactory server or repo, which are
-		// different then the resolution repo, then we have no information about which depedencies are actually
-		// missing and therefore should be published.
-		// Let's find out which depedencies are missing.
-		if !reflect.DeepEqual(resolverDeployer.Resolver(), resolverDeployer.Deployer()) {
-			err = findMissingDepedencies(&cache, dependenciesToPublish, resolverDeployer)
-			if err != nil {
-				return err
-			}
-		}
-		// Publish the missing dependencies to Artifactory.
-		err = populateAndPublish(resolverDeployer.Deployer().Repo(), cachePath, dependenciesInterface, packageDependencies, &cache, resolverDeployer.Deployer().ServiceManager())
-		if err != nil {
-			return err
-		}
-	}
-
-	utils.LogFinishedMsg(&cache)
-	return nil
-}
-
-// Performs a head request to the deployer server to select the dependencies that need to be published to that server
-func findMissingDepedencies(cache *cache.DependenciesCache, dependenciesToPublish map[string]bool, resolverDeployer *params.ResolverDeployer) error {
-	client, err := httpclient.ClientBuilder().Build()
-	if err != nil {
-		return err
-	}
-	cacheDependenciesMap := cache.GetMap()
-	for module := range dependenciesToPublish {
-		nameAndVersion := strings.Split(module, "@")
-		// Perform a head request for the deployer server
-		resp, err := performHeadRequest(resolverDeployer.Deployer().ServiceManager().GetConfig().GetServiceDetails(), client, resolverDeployer.Deployer().Repo(), nameAndVersion[0], nameAndVersion[1])
-		if err != nil {
-			return err
-		}
-		// Change the cache map to indicate which dependencies are missing in the deployer server.
-		var dependencyExists bool
-		if resp.StatusCode == 200 {
-			dependencyExists = true
-		} else if resp.StatusCode == 404 {
-			dependencyExists = false
-		} else {
-			return errorutils.CheckError(fmt.Errorf("Artifactory response for %s:%d", module, resp.StatusCode))
-		}
-		cacheDependenciesMap[goModEncode(nameAndVersion[0])+":"+goModEncode(nameAndVersion[1])] = dependencyExists
-	}
-	return nil
-}
-
-func populateAndPublish(targetRepo, cachePath string, dependenciesInterface GoPackage, packageDependencies []Package, cache *cache.DependenciesCache, serviceManager artifactory.ArtifactoryServicesManager) error {
-	cache.IncrementTotal(len(packageDependencies))
-	for _, dep := range packageDependencies {
-		dependenciesInterface = dependenciesInterface.New(cachePath, dep)
-		err := dependenciesInterface.PopulateModAndPublish(targetRepo, cache, serviceManager)
-		if err != nil {
-			// If using recursive publish - the error always nil. If we got here, means that this error happened when not using recursive publish.
-			return err
-		}
-	}
-	return nil
-}
-
-// Collects the dependencies of the project
-func collectProjectDependencies(targetRepo, rootProjectDir string, cache *cache.DependenciesCache, auth auth.ServiceDetails) (map[string]bool, error) {
-	dependenciesMap, err := getDependenciesListWithFallback(targetRepo, auth)
-	if err != nil {
-		return nil, err
-	}
-
-	sumFileContent, sumFileStat, err := cmd.GetGoSum(rootProjectDir)
-	if err != nil {
-		return nil, err
-	}
-	if len(sumFileContent) > 0 && sumFileStat != nil {
-		defer cmd.RestoreSumFile(rootProjectDir, sumFileContent, sumFileStat)
-	}
-	projectDependencies, err := downloadDependencies(targetRepo, cache, dependenciesMap, auth)
-	if err != nil {
-		return projectDependencies, err
-	}
-	return projectDependencies, nil
-}
-
-func downloadDependencies(targetRepo string, cache *cache.DependenciesCache, depMap map[string]bool, auth auth.ServiceDetails) (map[string]bool, error) {
-	client, err := httpclient.ClientBuilder().Build()
-	if err != nil {
-		return nil, err
-	}
-	cacheDependenciesMap := cache.GetMap()
-	dependenciesMap := map[string]bool{}
-	for module := range depMap {
-		nameAndVersion := strings.Split(module, "@")
-		resp, err := performHeadRequest(auth, client, targetRepo, nameAndVersion[0], nameAndVersion[1])
-		if err != nil {
-			return dependenciesMap, err
-		}
-
-		if resp.StatusCode == 200 {
-			cacheDependenciesMap[goModEncode(nameAndVersion[0])+":"+goModEncode(nameAndVersion[1])] = true
-			err = downloadDependency(true, module, targetRepo, auth)
-			dependenciesMap[module] = true
-		} else if resp.StatusCode == 404 {
-			cacheDependenciesMap[goModEncode(nameAndVersion[0])+":"+goModEncode(nameAndVersion[1])] = false
-			err = downloadDependency(false, module, targetRepo, nil)
-			dependenciesMap[module] = false
-		}
-
-		if err != nil {
-			return dependenciesMap, err
-		}
-	}
-	return dependenciesMap, nil
-}
 
 func performHeadRequest(auth auth.ServiceDetails, client *httpclient.HttpClient, targetRepo, module, version string) (*http.Response, error) {
 	url := auth.GetUrl() + "api/go/" + targetRepo + "/" + module + "/@v/" + version + ".mod"
@@ -222,24 +80,6 @@ func goModDecode(name string) string {
 	return str
 }
 
-// Runs the go mod download command. Should set first the environment variable of GoProxy
-func downloadDependency(downloadFromArtifactory bool, fullDependencyName, targetRepo string, auth auth.ServiceDetails) error {
-	var err error
-	if downloadFromArtifactory {
-		log.Debug("Downloading dependency from Artifactory:", fullDependencyName)
-		err = utils.SetGoProxyWithApi(targetRepo, auth)
-	} else {
-		log.Debug("Downloading dependency from VCS:", fullDependencyName)
-		err = os.Unsetenv(utils.GOPROXY)
-	}
-	if errorutils.CheckError(err) != nil {
-		return err
-	}
-
-	err = cmd.DownloadDependency(fullDependencyName)
-	return err
-}
-
 // Downloads the mod file from Artifactory to the Go cache
 func downloadModFileFromArtifactoryToLocalCache(cachePath, targetRepo, name, version string, auth auth.ServiceDetails, client *httpclient.HttpClient) string {
 	pathToModuleCache := filepath.Join(cachePath, name, "@v")
@@ -269,20 +109,6 @@ func downloadModFileFromArtifactoryToLocalCache(cachePath, targetRepo, name, ver
 		return filepath.Join(downloadFileDetails.LocalPath, downloadFileDetails.LocalFileName)
 	}
 	return ""
-}
-
-func downloadAndCreateDependency(cachePath, name, version, fullDependencyName, targetRepo string, downloadedFromArtifactory bool, auth auth.ServiceDetails) (*Package, error) {
-	// Dependency is missing within the cache. Need to download it...
-	err := downloadDependency(downloadedFromArtifactory, fullDependencyName, targetRepo, auth)
-	if err != nil {
-		return nil, err
-	}
-	// Now that this dependency in the cache, get the dependency object
-	dep, err := createDependency(cachePath, name, version)
-	if err != nil {
-		return nil, err
-	}
-	return dep, nil
 }
 
 func shouldDownloadFromArtifactory(module, version, targetRepo string, auth auth.ServiceDetails, client *httpclient.HttpClient) (bool, error) {
@@ -376,77 +202,6 @@ func getPackagePathIfExists(cachePath, dependencyName, version string) (zipPath 
 		return "", nil
 	}
 	return zipPath, nil
-}
-
-// Runs 'go list -m all' command with fallback.
-func getDependenciesListWithFallback(targetRepo string, auth auth.ServiceDetails) (map[string]bool, error) {
-	dependenciesMap := map[string]bool{}
-	modulesWithErrors := map[string]previousTries{}
-	usedProxy := true
-
-	for {
-		// Configuring each run to use Artifactory/VCS
-		err := setOrUnsetGoProxy(usedProxy, targetRepo, auth)
-		if err != nil {
-			return nil, err
-		}
-
-		usedProxy = !usedProxy
-		dependenciesMap, err = cmd.GetDependenciesList("")
-		if err == nil {
-			break
-		}
-
-		moduleAndVersion, err := getModuleAndVersion(usedProxy, err)
-		if err != nil {
-			return nil, err
-		}
-
-		modulePreviousTries, ok := modulesWithErrors[moduleAndVersion]
-		modulePreviousTries.setTriedFrom(usedProxy)
-		if ok && modulePreviousTries.triedFromVCS && modulePreviousTries.triedFromArtifactory {
-			return nil, errorutils.CheckError(errors.New(fmt.Sprintf(FailedToRetrieve+" %s "+FromBothArtifactoryAndVcs, moduleAndVersion)))
-		}
-		modulesWithErrors[moduleAndVersion] = modulePreviousTries
-	}
-
-	return dependenciesMap, nil
-}
-
-func setOrUnsetGoProxy(usedProxy bool, targetRepo string, auth auth.ServiceDetails) error {
-	if !usedProxy {
-		log.Debug("Trying download the dependencies from Artifactory...")
-		return utils.SetGoProxyWithApi(targetRepo, auth)
-	} else {
-		log.Debug("Trying download the dependencies from the VCS...")
-		return errorutils.CheckError(os.Unsetenv(utils.GOPROXY))
-	}
-}
-
-func getModuleAndVersion(usedProxy bool, err error) (string, error) {
-	splittedLine := strings.Split(err.Error(), ":")
-	utils.LogDebug(err, usedProxy)
-	if len(splittedLine) < 2 {
-		return "", errorutils.CheckError(errors.New("Missing module name and version in the error message " + err.Error()))
-	}
-	return strings.TrimSpace(splittedLine[1]), nil
-}
-
-func populateModWithTidy(path string) error {
-	err := os.Chdir(filepath.Dir(path))
-	if errorutils.CheckError(err) != nil {
-		return err
-	}
-	log.Debug("Preparing to populate mod", filepath.Dir(path))
-	err = removeGoSum(path)
-	utils.LogError(err)
-	// Running go mod tidy command
-	err = cmd.RunGoModTidy()
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func removeGoSum(path string) error {
