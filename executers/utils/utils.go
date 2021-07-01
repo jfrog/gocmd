@@ -6,14 +6,10 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"path/filepath"
+	"os"
 	"regexp"
-	"runtime"
-	"strings"
 
 	"github.com/jfrog/gocmd/cache"
-	"github.com/jfrog/gocmd/cmd"
-	gofrogio "github.com/jfrog/gofrog/io"
 	"github.com/jfrog/jfrog-client-go/auth"
 	"github.com/jfrog/jfrog-client-go/http/httpclient"
 	"github.com/jfrog/jfrog-client-go/utils"
@@ -22,6 +18,16 @@ import (
 )
 
 const GOPROXY = "GOPROXY"
+
+func SetGoProxyWithApi(repoName string, details auth.ServiceDetails) error {
+	url, err := GetArtifactoryApiUrl(repoName, details)
+	if err != nil {
+		return err
+	}
+
+	err = os.Setenv(GOPROXY, url)
+	return errorutils.CheckError(err)
+}
 
 func GetArtifactoryApiUrl(repoName string, details auth.ServiceDetails) (string, error) {
 	rtUrl, err := url.Parse(details.GetUrl())
@@ -79,38 +85,6 @@ func GetPackageVersion(repoName, packageName string, details auth.ServiceDetails
 	return version.Version, nil
 }
 
-// GetCachePath returns the location of downloads dir insied the GOMODCACHE
-func GetCachePath() (string, error) {
-	goModCachePath, err := GetGoModCachePath()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(goModCachePath, "cache", "download"), nil
-}
-
-// GetGoModCachePath returns the location of the go module cache
-func GetGoModCachePath() (string, error) {
-	goPath, err := getGOPATH()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(goPath, "pkg", "mod"), nil
-}
-
-// GetGOPATH returns the location of the GOPATH
-func getGOPATH() (string, error) {
-	goCmd, err := cmd.NewCmd()
-	if err != nil {
-		return "", errorutils.CheckError(err)
-	}
-	goCmd.Command = []string{"env", "GOPATH"}
-	output, err := gofrogio.RunCmdOutput(goCmd)
-	if errorutils.CheckError(err) != nil {
-		return "", fmt.Errorf("Could not find GOPATH env: %s", err.Error())
-	}
-	return strings.TrimSpace(parseGoPath(string(output))), nil
-}
-
 func GetRegex() (regExp *RegExp, err error) {
 	emptyRegex, err := utils.GetRegExp(`^\s*require (?:[\(\w\.@:%_\+-.~#?&]?.+)`)
 	if err != nil {
@@ -160,15 +134,6 @@ func (reg *RegExp) GetNotEmptyModRegex() *regexp.Regexp {
 
 func (reg *RegExp) GetIndirectRegex() *regexp.Regexp {
 	return reg.indirectRegex
-}
-
-func parseGoPath(goPath string) string {
-	if runtime.GOOS == "windows" {
-		goPathSlice := strings.Split(goPath, ";")
-		return goPathSlice[0]
-	}
-	goPathSlice := strings.Split(goPath, ":")
-	return goPathSlice[0]
 }
 
 type PackageVersionResponseContent struct {

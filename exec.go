@@ -1,9 +1,10 @@
 package gocmd
 
 import (
-	"github.com/jfrog/gocmd/executers"
+	"github.com/jfrog/gocmd/cmd"
+	"github.com/jfrog/jfrog-client-go/auth"
 )
 
-func RunWithFallback(goArg []string) error {
-	return executers.RunWithFallbacks(goArg)
+func Run(goArg []string, server auth.ServiceDetails, repo string) error {
+	return cmd.RunGo(goArg, server, repo)
 }

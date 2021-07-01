@@ -2,13 +2,18 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
+	"github.com/jfrog/gocmd/executers/utils"
 	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strings"
 
 	gofrogcmd "github.com/jfrog/gofrog/io"
+	"github.com/jfrog/jfrog-client-go/auth"
 	"github.com/jfrog/jfrog-client-go/utils/errorutils"
 	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
 	"github.com/jfrog/jfrog-client-go/utils/log"
@@ -16,24 +21,6 @@ import (
 
 // Used for masking basic auth credentials as part of a URL.
 var protocolRegExp *gofrogcmd.CmdOutputPattern
-
-// Used for identifying an "unrecognized import" log line when executing the go client.
-var unrecognizedImportRegExp *gofrogcmd.CmdOutputPattern
-
-// Used for identifying an "404 not found" log line when executing the go client.
-// Compatible with the log message format before go 1.13.
-var notFoundRegExp *gofrogcmd.CmdOutputPattern
-
-// Used for identifying an "404 not found" log line when executing the go client.
-// Compatible with the log message format starting from go 1.13.
-var notFoundGo113RegExp *gofrogcmd.CmdOutputPattern
-
-// Used for identifying an "unknown revision" log line when executing the go client.
-var unknownRevisionRegExp *gofrogcmd.CmdOutputPattern
-
-// Used for identifying a case where the zip is not found in the repository,
-// using the go client log output,
-var notFoundZipRegExp *gofrogcmd.CmdOutputPattern
 
 func NewCmd() (*Cmd, error) {
 	execPath, err := exec.LookPath("go")
@@ -84,7 +71,9 @@ func GetGoVersion() (string, error) {
 	return output, errorutils.CheckError(err)
 }
 
-func RunGo(goArg []string) error {
+func RunGo(goArg []string, server auth.ServiceDetails, repo string) error {
+	utils.SetGoProxyWithApi(repo, server)
+
 	goCmd, err := NewCmd()
 	if err != nil {
 		return err
@@ -100,11 +89,25 @@ func RunGo(goArg []string) error {
 		return err
 	}
 	if performPasswordMask {
-		_, _, _, err = gofrogcmd.RunCmdWithOutputParser(goCmd, true, protocolRegExp, notFoundRegExp, notFoundGo113RegExp, unrecognizedImportRegExp, unknownRevisionRegExp, notFoundZipRegExp)
+		_, _, _, err = gofrogcmd.RunCmdWithOutputParser(goCmd, true, protocolRegExp)
 	} else {
-		_, _, _, err = gofrogcmd.RunCmdWithOutputParser(goCmd, true, notFoundRegExp, notFoundGo113RegExp, unrecognizedImportRegExp, unknownRevisionRegExp, notFoundZipRegExp)
+		_, _, _, err = gofrogcmd.RunCmdWithOutputParser(goCmd, true)
 	}
 	return errorutils.CheckError(err)
+}
+
+// GetGOPATH returns the location of the GOPATH
+func getGOPATH() (string, error) {
+	goCmd, err := NewCmd()
+	if err != nil {
+		return "", errorutils.CheckError(err)
+	}
+	goCmd.Command = []string{"env", "GOPATH"}
+	output, err := gofrogcmd.RunCmdOutput(goCmd)
+	if errorutils.CheckError(err) != nil {
+		return "", fmt.Errorf("Could not find GOPATH env: %s", err.Error())
+	}
+	return strings.TrimSpace(parseGoPath(string(output))), nil
 }
 
 // Using go mod download {dependency} command to download the dependency
@@ -169,9 +172,9 @@ func GetDependenciesList(projectDir string) (map[string]bool, error) {
 	var output string
 	var executionError error
 	if performPasswordMask {
-		output, _, _, executionError = gofrogcmd.RunCmdWithOutputParser(goCmd, true, protocolRegExp, notFoundRegExp, unrecognizedImportRegExp, unknownRevisionRegExp)
+		output, _, _, executionError = gofrogcmd.RunCmdWithOutputParser(goCmd, true, protocolRegExp)
 	} else {
-		output, _, _, executionError = gofrogcmd.RunCmdWithOutputParser(goCmd, true, notFoundRegExp, unrecognizedImportRegExp, unknownRevisionRegExp)
+		output, _, _, executionError = gofrogcmd.RunCmdWithOutputParser(goCmd, true)
 	}
 
 	if len(output) != 0 {
@@ -191,41 +194,6 @@ func GetDependenciesList(projectDir string) (map[string]bool, error) {
 	}
 
 	return outputToMap(output), errorutils.CheckError(err)
-}
-
-// Using go mod download command to download all the dependencies before publishing to Artifactory
-func RunGoModTidy() error {
-	pwd, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-
-	log.Info("Running 'go mod tidy' in", pwd)
-	goCmd, err := NewCmd()
-	if err != nil {
-		return err
-	}
-
-	goCmd.Command = []string{"mod", "tidy"}
-	_, err = gofrogcmd.RunCmdOutput(goCmd)
-	return err
-}
-
-func RunGoModInit(moduleName string) error {
-	pwd, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-
-	log.Info("Running 'go mod init' in", pwd)
-	goCmd, err := NewCmd()
-	if err != nil {
-		return err
-	}
-
-	goCmd.Command = []string{"mod", "init", moduleName}
-	_, _, _, err = gofrogcmd.RunCmdWithOutputParser(goCmd, true)
-	return err
 }
 
 // Returns the root dir where the go.mod located.
@@ -276,4 +244,31 @@ func GetProjectRoot() (string, error) {
 	}
 
 	return "", errorutils.CheckError(errors.New("Could not find go.mod for project."))
+}
+
+// GetGoModCachePath returns the location of the go module cache
+func GetGoModCachePath() (string, error) {
+	goPath, err := getGOPATH()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(goPath, "pkg", "mod"), nil
+}
+
+// GetCachePath returns the location of downloads dir insied the GOMODCACHE
+func GetCachePath() (string, error) {
+	goModCachePath, err := GetGoModCachePath()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(goModCachePath, "cache", "download"), nil
+}
+
+func parseGoPath(goPath string) string {
+	if runtime.GOOS == "windows" {
+		goPathSlice := strings.Split(goPath, ";")
+		return goPathSlice[0]
+	}
+	goPathSlice := strings.Split(goPath, ":")
+	return goPathSlice[0]
 }

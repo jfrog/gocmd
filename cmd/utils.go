@@ -29,11 +29,7 @@ var shouldMask *bool = nil
 var autoModify *bool = nil
 
 func prepareRegExp() error {
-	err := prepareGlobalRegExp()
-	if err != nil {
-		return err
-	}
-	return prepareNotFoundZipRegExp()
+	return prepareGlobalRegExp()
 }
 
 // Compiles all the regex once
@@ -47,44 +43,6 @@ func prepareGlobalRegExp() error {
 		}
 	}
 
-	if notFoundRegExp == nil {
-		log.Debug("Initializing not found regexp")
-		notFoundRegExp, err = initRegExp(`^go: ([^\/\r\n]+\/[^\r\n\s:]*).*(404( Not Found)?[\s]?)$`, Error)
-		if err != nil {
-			return err
-		}
-	}
-
-	if notFoundGo113RegExp == nil {
-		log.Debug("Initializing not found go 1.13 regexp")
-		notFoundGo113RegExp, err = initRegExp(`^[\s]*[\s](.+)@(.+):[\s]reading[\s].*(404( Not Found)?[\s]?)$`, Error)
-		if err != nil {
-			return err
-		}
-	}
-
-	if unrecognizedImportRegExp == nil {
-		log.Debug("Initializing unrecognized import path regexp")
-		unrecognizedImportRegExp, err = initRegExp(`[^go:]([^\/\r\n]+\/[^\r\n\s:]*).*(unrecognized import path)`, Error)
-		if err != nil {
-			return err
-		}
-	}
-
-	if unknownRevisionRegExp == nil {
-		log.Debug("Initializing unknown revision regexp")
-		unknownRevisionRegExp, err = initRegExp(`[^go:]([^\/\r\n]+\/[^\r\n\s:]*).*(unknown revision)`, Error)
-	}
-
-	return err
-}
-
-func prepareNotFoundZipRegExp() error {
-	var err error
-	if notFoundZipRegExp == nil {
-		log.Debug("Initializing not found zip file")
-		notFoundZipRegExp, err = initRegExp(`unknown import path ["]([^\/\r\n]+\/[^\r\n\s:]*)["].*(404( Not Found)?[\s]?)$`, Error)
-	}
 	return err
 }
 
