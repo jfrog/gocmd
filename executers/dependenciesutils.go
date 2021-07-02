@@ -9,7 +9,6 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/jfrog/gocmd/executers/utils"
 	"github.com/jfrog/jfrog-client-go/auth"
 	"github.com/jfrog/jfrog-client-go/http/httpclient"
 	"github.com/jfrog/jfrog-client-go/utils/errorutils"
@@ -231,14 +230,4 @@ func (pt *previousTries) setTriedFrom(usedProxy bool) {
 	} else {
 		pt.triedFromVCS = true
 	}
-}
-
-// Download the dependencies from VCS and publish them to Artifactory.
-func getDependencies(dependenciesToPublish map[string]bool) (cachePath string, packageDependencies []Package, err error) {
-	cachePath, err = utils.GetCachePath()
-	if err != nil {
-		return
-	}
-	packageDependencies, err = GetDependencies(cachePath, dependenciesToPublish)
-	return
 }
