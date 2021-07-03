@@ -4,7 +4,7 @@ go 1.15
 
 require (
 	github.com/jfrog/gofrog v1.0.6
-	github.com/jfrog/jfrog-client-go v1.0.0
+	github.com/jfrog/jfrog-client-go v1.0.1
 	github.com/stretchr/testify v1.7.0
 )
 
