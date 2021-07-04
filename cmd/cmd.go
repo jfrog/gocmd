@@ -172,9 +172,9 @@ func GetDependenciesList(projectDir string) (map[string]bool, error) {
 	var output string
 	var executionError error
 	if performPasswordMask {
-		output, _, _, executionError = gofrogcmd.RunCmdWithOutputParser(goCmd, true, protocolRegExp)
+		output, _, _, executionError = gofrogcmd.RunCmdWithOutputParser(goCmd, false, protocolRegExp)
 	} else {
-		output, _, _, executionError = gofrogcmd.RunCmdWithOutputParser(goCmd, true)
+		output, _, _, executionError = gofrogcmd.RunCmdWithOutputParser(goCmd, false)
 	}
 
 	if len(output) != 0 {
