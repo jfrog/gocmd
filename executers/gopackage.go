@@ -109,7 +109,7 @@ func (dependencyPackage *Package) Dependencies() []buildinfo.Dependency {
 func (dependencyPackage *Package) CreateBuildInfoDependencies() error {
 	// Zip file dependency for the build-info
 	zipDependency := buildinfo.Dependency{Id: dependencyPackage.id}
-	fileDetails, err := fileutils.GetFileDetails(dependencyPackage.zipPath)
+	fileDetails, err := fileutils.GetFileDetails(dependencyPackage.zipPath, true)
 	if err != nil {
 		return err
 	}
