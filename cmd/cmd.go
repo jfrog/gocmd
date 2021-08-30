@@ -121,53 +121,81 @@ func DownloadDependency(dependencyName string) error {
 	return errorutils.CheckError(gofrogcmd.RunCmd(goCmd))
 }
 
-// Runs 'go list -m all' command and returns map of the dependencies
+// Runs 'go list -m' command and returns module name
+func GetModuleNameByDir(projectDir string) (string, error) {
+	log.Info("Running 'go list -m' in", projectDir)
+	output, err := runDependenciesCmd(projectDir, []string{"list", "-m"})
+	if err != nil {
+		return "", err
+	}
+	lineOutput := strings.Split(output, "\n")
+	return lineOutput[0], errorutils.CheckError(err)
+}
+
+// Runs go list -f {{with .Module}}{{.Path}}:{{.Version}}{{end}} all command and returns map of the dependencies
 func GetDependenciesList(projectDir string) (map[string]bool, error) {
+	log.Info("Running 'go list -f {{with .Module}}{{.Path}}@{{.Version}}{{end}} all' in", projectDir)
+	//isAutoModify, err := automaticallyModifyMod()
+	//if err != nil {
+	//	return nil, err
+	//}
+	//// Since version go1.16 build commands (like go build and go list) no longer modify go.mod and go.sum by default.
+	//if isAutoModify {
+	//	goCmd.Command = []string{"list", "-m", "all"}
+	//} else {
+	//	goCmd.Command = []string{"list", "-m", "-mod=mod", "all"}
+	//}
+	output, err := runDependenciesCmd(projectDir, []string{"list", "-f", "{{with .Module}}{{.Path}}@{{.Version}}{{end}}", "all"})
+	if err != nil {
+		return nil, err
+	}
+	return listToMap(output), errorutils.CheckError(err)
+}
+
+// Runs 'go mod graph' command and returns slice of the dependencies
+func GetDependenciesGraph(projectDir string) (map[string][]string, error) {
+	log.Info("Running 'go mod graph' in", projectDir)
+	output, err := runDependenciesCmd(projectDir, []string{"mod", "graph"})
+	if err != nil {
+		return nil, err
+	}
+	return graphToMap(output), errorutils.CheckError(err)
+}
+
+// Runs 'go mod graph' command and returns slice of the dependencies
+func runDependenciesCmd(projectDir string, commandArgs []string) (string, error) {
 	var err error
 	if projectDir == "" {
 		projectDir, err = GetProjectRoot()
 		if err != nil {
-			return nil, err
+			return "", err
 		}
 	}
-
 	// Read and store the details of the go.mod and go.sum files,
-	// because they may change by the "go list" command.
+	// because they may change by the "go graph/list" command.
 	modFileContent, modFileStat, err := GetFileDetails(filepath.Join(projectDir, "go.mod"))
 	if err != nil {
 		log.Info("Dependencies were not collected for this build, since go.mod could not be found in", projectDir)
-		return nil, nil
+		return "", nil
 	}
 	sumFileContent, sumFileStat, err := GetGoSum(projectDir)
 	if len(sumFileContent) > 0 && sumFileStat != nil {
 		defer RestoreSumFile(projectDir, sumFileContent, sumFileStat)
 	}
-
-	log.Info("Running 'go list -m all' in", projectDir)
 	goCmd, err := NewCmd()
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	isAutoModify, err := automaticallyModifyMod()
-	if err != nil {
-		return nil, err
-	}
-	// Since version go1.16 build commands (like go build and go list) no longer modify go.mod and go.sum by default.
-	if isAutoModify {
-		goCmd.Command = []string{"list", "-m", "all"}
-	} else {
-		goCmd.Command = []string{"list", "-m", "-mod=mod", "all"}
-	}
+	goCmd.Command = commandArgs
 	goCmd.Dir = projectDir
 
 	err = prepareGlobalRegExp()
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-
 	performPasswordMask, err := shouldMaskPassword()
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	var output string
 	var executionError error
@@ -176,24 +204,21 @@ func GetDependenciesList(projectDir string) (map[string]bool, error) {
 	} else {
 		output, _, _, executionError = gofrogcmd.RunCmdWithOutputParser(goCmd, true)
 	}
-
 	if len(output) != 0 {
 		log.Debug(output)
 	}
-
 	if executionError != nil {
 		// If the command fails, the mod stays the same, therefore, don't need to be restored.
-		return nil, errorutils.CheckError(executionError)
+		return "", errorutils.CheckError(executionError)
 	}
 
 	// Restore the the go.mod and go.sum files, to make sure they stay the same as before
-	// running the "go list" command.
+	// running the "go mod graph" command.
 	err = ioutil.WriteFile(filepath.Join(projectDir, "go.mod"), modFileContent, modFileStat.Mode())
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-
-	return outputToMap(output), errorutils.CheckError(err)
+	return output, err
 }
 
 // Returns the root dir where the go.mod located.
