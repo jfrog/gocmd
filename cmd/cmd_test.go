@@ -127,7 +127,12 @@ func TestGetDependenciesList(t *testing.T) {
 		assert.NoError(t, err)
 	}()
 	originSumFileContent, _, err := GetGoSum(gomodPath)
-
+	err = fileutils.MoveFile(filepath.Join(gomodPath, "test.go.txt"), filepath.Join(gomodPath, "test.go"))
+	assert.NoError(t, err)
+	defer func() {
+		err := fileutils.MoveFile(filepath.Join(gomodPath, "test.go"), filepath.Join(gomodPath, "test.go.txt"))
+		assert.NoError(t, err)
+	}()
 	actual, err := GetDependenciesList(filepath.Join(gomodPath))
 	if err != nil {
 		t.Error(err)
@@ -141,10 +146,10 @@ func TestGetDependenciesList(t *testing.T) {
 	}
 
 	expected := map[string]bool{
-		"golang.org/x/text@v0.3.3":                              true,
-		"golang.org/x/tools@v0.0.0-20180917221912-90fa682c2a6e": true,
-		"rsc.io/quote@v1.5.2":                                   true,
-		"rsc.io/sampler@v1.3.0":                                 true,
+		"golang.org/x/text@v0.3.3": true,
+		"rsc.io/quote@v1.5.2":      true,
+		"rsc.io/sampler@v1.3.0":    true,
+		"testGoList@":              true,
 	}
 	if !reflect.DeepEqual(expected, actual) {
 		t.Errorf("Expecting: \n%v \nGot: \n%v", expected, actual)

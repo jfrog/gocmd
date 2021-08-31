@@ -124,7 +124,18 @@ func DownloadDependency(dependencyName string) error {
 // Runs 'go list -m' command and returns module name
 func GetModuleNameByDir(projectDir string) (string, error) {
 	log.Info("Running 'go list -m' in", projectDir)
-	output, err := runDependenciesCmd(projectDir, []string{"list", "-m"})
+	isAutoModify, err := automaticallyModifyMod()
+	if err != nil {
+		return "", err
+	}
+	var cmdArgs []string
+	// Since version go1.16 build commands (like go build and go list) no longer modify go.mod and go.sum by default.
+	if isAutoModify {
+		cmdArgs = []string{"list", "-m"}
+	} else {
+		cmdArgs = []string{"list", "-m", "-mod=mod"}
+	}
+	output, err := runDependenciesCmd(projectDir, cmdArgs)
 	if err != nil {
 		return "", err
 	}
@@ -135,16 +146,7 @@ func GetModuleNameByDir(projectDir string) (string, error) {
 // Runs go list -f {{with .Module}}{{.Path}}:{{.Version}}{{end}} all command and returns map of the dependencies
 func GetDependenciesList(projectDir string) (map[string]bool, error) {
 	log.Info("Running 'go list -f {{with .Module}}{{.Path}}@{{.Version}}{{end}} all' in", projectDir)
-	//isAutoModify, err := automaticallyModifyMod()
-	//if err != nil {
-	//	return nil, err
-	//}
-	//// Since version go1.16 build commands (like go build and go list) no longer modify go.mod and go.sum by default.
-	//if isAutoModify {
-	//	goCmd.Command = []string{"list", "-m", "all"}
-	//} else {
-	//	goCmd.Command = []string{"list", "-m", "-mod=mod", "all"}
-	//}
+
 	output, err := runDependenciesCmd(projectDir, []string{"list", "-f", "{{with .Module}}{{.Path}}@{{.Version}}{{end}}", "all"})
 	if err != nil {
 		return nil, err
