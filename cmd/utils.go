@@ -104,33 +104,31 @@ func GetFileDetails(filePath string) (modFileContent []byte, modFileStat os.File
 	return
 }
 
-func outputToMap(output string) map[string]bool {
+func listToMap(output string) map[string]bool {
 	lineOutput := strings.Split(output, "\n")
 	mapOfDeps := map[string]bool{}
-
 	for _, line := range lineOutput {
-		splitLine := strings.Split(line, " ")
-		lineLen := len(splitLine)
-		if lineLen == 2 {
-			mapOfDeps[splitLine[0]+"@"+splitLine[1]] = true
+		// The expected syntax : github.com/name@v1.2.3
+		if len(strings.Split(line, "@")) == 2 && mapOfDeps[line] == false {
+			mapOfDeps[line] = true
 			continue
 		}
-		// In a case of a replace statement : source version => target version
-		// choose the target version.
-		if lineLen == 5 {
-			if splitLine[2] == "=>" {
-				mapOfDeps[splitLine[3]+"@"+splitLine[4]] = true
-				continue
-			}
-		}
-		// In a case of a replace statement with a local filesystem target: source version => local_target
-		// local target won't be added to the dependencies map.
-		if lineLen == 4 && splitLine[0] != "go:" {
-			if splitLine[2] == "=>" {
-				log.Info("The replacer is not pointing to a VCS version: " + splitLine[0] + ",\nThis dependency won't be added to the requested build dependencies list.")
-			}
-		}
+	}
+	return mapOfDeps
+}
 
+func graphToMap(output string) map[string][]string {
+	lineOutput := strings.Split(output, "\n")
+	mapOfDeps := map[string][]string{}
+	for _, line := range lineOutput {
+		// The expected syntax : github.com/parentname@v1.2.3 github.com/childname@v1.2.3
+		line = strings.ReplaceAll(line, "@v", ":")
+		splitLine := strings.Split(line, " ")
+		if len(splitLine) == 2 {
+			parent := splitLine[0]
+			child := splitLine[1]
+			mapOfDeps[parent] = append(mapOfDeps[parent], child)
+		}
 	}
 	return mapOfDeps
 }
