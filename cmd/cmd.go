@@ -154,7 +154,7 @@ func GetDependenciesList(projectDir string) (map[string]bool, error) {
 	return listToMap(output), errorutils.CheckError(err)
 }
 
-// Runs 'go mod graph' command and returns slice of the dependencies
+// Runs 'go mod graph' command and returns map that maps dependencies to their child dependencies slice
 func GetDependenciesGraph(projectDir string) (map[string][]string, error) {
 	log.Info("Running 'go mod graph' in", projectDir)
 	output, err := runDependenciesCmd(projectDir, []string{"mod", "graph"})
@@ -164,7 +164,7 @@ func GetDependenciesGraph(projectDir string) (map[string][]string, error) {
 	return graphToMap(output), errorutils.CheckError(err)
 }
 
-// Runs 'go mod graph' command and returns slice of the dependencies
+// Common function to run dependencies command for list or graph commands
 func runDependenciesCmd(projectDir string, commandArgs []string) (string, error) {
 	var err error
 	if projectDir == "" {
@@ -174,7 +174,7 @@ func runDependenciesCmd(projectDir string, commandArgs []string) (string, error)
 		}
 	}
 	// Read and store the details of the go.mod and go.sum files,
-	// because they may change by the "go graph/list" command.
+	// because they may change by the 'go mod graph' or 'go list' commands.
 	modFileContent, modFileStat, err := GetFileDetails(filepath.Join(projectDir, "go.mod"))
 	if err != nil {
 		log.Info("Dependencies were not collected for this build, since go.mod could not be found in", projectDir)

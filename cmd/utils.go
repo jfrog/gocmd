@@ -108,7 +108,7 @@ func listToMap(output string) map[string]bool {
 	lineOutput := strings.Split(output, "\n")
 	mapOfDeps := map[string]bool{}
 	for _, line := range lineOutput {
-		//expected syntax : github.com/name@v1.2.3
+		// The expected syntax : github.com/name@v1.2.3
 		if len(strings.Split(line, "@")) == 2 && mapOfDeps[line] == false {
 			mapOfDeps[line] = true
 			continue
@@ -121,7 +121,7 @@ func graphToMap(output string) map[string][]string {
 	lineOutput := strings.Split(output, "\n")
 	mapOfDeps := map[string][]string{}
 	for _, line := range lineOutput {
-		//expected syntax : github.com/parentname@v1.2.3 github.com/childname@v1.2.3
+		// The expected syntax : github.com/parentname@v1.2.3 github.com/childname@v1.2.3
 		line = strings.ReplaceAll(line, "@v", ":")
 		splitLine := strings.Split(line, " ")
 		if len(splitLine) == 2 {
