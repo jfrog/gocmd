@@ -2,10 +2,10 @@ package executers
 
 import (
 	"fmt"
+	buildinfo "github.com/asafgabai/build-info-go/entities"
 
 	"github.com/jfrog/gocmd/cache"
 	"github.com/jfrog/jfrog-client-go/artifactory"
-	"github.com/jfrog/jfrog-client-go/artifactory/buildinfo"
 	_go "github.com/jfrog/jfrog-client-go/artifactory/services/go"
 	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
 	"github.com/jfrog/jfrog-client-go/utils/log"
