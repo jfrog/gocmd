@@ -211,8 +211,7 @@ func runDependenciesCmd(projectDir string, commandArgs []string) (string, error)
 	}
 	if executionError != nil {
 		// If the command fails, the mod stays the same, therefore, don't need to be restored.
-		log.Error(fmt.Sprintf("Failed running Go command %v in %s", commandArgs, projectDir))
-		return "", errorutils.CheckError(executionError)
+		return "", errorutils.CheckError(errors.New(fmt.Sprintf("Failed running Go command %v in %s with error: '%s'", commandArgs, projectDir, executionError.Error())))
 	}
 
 	// Restore the the go.mod and go.sum files, to make sure they stay the same as before
