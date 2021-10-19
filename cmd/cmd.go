@@ -124,12 +124,12 @@ func DownloadDependency(dependencyName string) error {
 
 // Runs 'go list -m' command and returns module name
 func GetModuleNameByDir(projectDir string) (string, error) {
-	log.Info("Running 'go list -m' in", projectDir)
 	cmdArgs, err := getListCmdArgs()
 	if err != nil {
 		return "", err
 	}
 	cmdArgs = append(cmdArgs, "-m")
+	log.Info(fmt.Sprintf("Running 'go %s' in %s", strings.Join(cmdArgs, " "), projectDir))
 	output, err := runDependenciesCmd(projectDir, cmdArgs)
 	if err != nil {
 		return "", err
@@ -153,12 +153,13 @@ func getListCmdArgs() (cmdArgs []string, err error) {
 
 // Runs go list -f {{with .Module}}{{.Path}}:{{.Version}}{{end}} all command and returns map of the dependencies
 func GetDependenciesList(projectDir string) (map[string]bool, error) {
-	log.Info("Running 'go list -f {{with .Module}}{{.Path}}@{{.Version}}{{end}} all' in", projectDir)
 	cmdArgs, err := getListCmdArgs()
 	if err != nil {
 		return nil, err
 	}
-	output, err := runDependenciesCmd(projectDir, append(cmdArgs, []string{"-f", "{{with .Module}}{{.Path}}@{{.Version}}{{end}}", "all"}...))
+	cmdArgs = append(cmdArgs, "-f", "{{with .Module}}{{.Path}}@{{.Version}}{{end}}", "all")
+	log.Info(fmt.Sprintf("Running 'go %s' in %s", strings.Join(cmdArgs, " "), projectDir))
+	output, err := runDependenciesCmd(projectDir, cmdArgs)
 	if err != nil {
 		return nil, err
 	}
