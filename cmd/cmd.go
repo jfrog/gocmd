@@ -3,7 +3,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"github.com/jfrog/gocmd/executers/utils"
 	"io"
 	"io/ioutil"
 	"os"
@@ -11,6 +10,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/jfrog/gocmd/executers/utils"
 
 	gofrogcmd "github.com/jfrog/gofrog/io"
 	"github.com/jfrog/jfrog-client-go/auth"
@@ -124,17 +125,11 @@ func DownloadDependency(dependencyName string) error {
 // Runs 'go list -m' command and returns module name
 func GetModuleNameByDir(projectDir string) (string, error) {
 	log.Info("Running 'go list -m' in", projectDir)
-	isAutoModify, err := automaticallyModifyMod()
+	cmdArgs, err := getListCmdArgs()
 	if err != nil {
 		return "", err
 	}
-	var cmdArgs []string
-	// Since version go1.16 build commands (like go build and go list) no longer modify go.mod and go.sum by default.
-	if isAutoModify {
-		cmdArgs = []string{"list", "-m"}
-	} else {
-		cmdArgs = []string{"list", "-m", "-mod=mod"}
-	}
+	cmdArgs = append(cmdArgs, "-m")
 	output, err := runDependenciesCmd(projectDir, cmdArgs)
 	if err != nil {
 		return "", err
@@ -143,11 +138,27 @@ func GetModuleNameByDir(projectDir string) (string, error) {
 	return lineOutput[0], errorutils.CheckError(err)
 }
 
+// Gets go list command args according to go version
+func getListCmdArgs() (cmdArgs []string, err error) {
+	isAutoModify, err := automaticallyModifyMod()
+	if err != nil {
+		return []string{}, err
+	}
+	// Since version go1.16 build commands (like go build and go list) no longer modify go.mod and go.sum by default.
+	if isAutoModify {
+		return []string{"list"}, nil
+	}
+	return []string{"list", "-mod=mod"}, nil
+}
+
 // Runs go list -f {{with .Module}}{{.Path}}:{{.Version}}{{end}} all command and returns map of the dependencies
 func GetDependenciesList(projectDir string) (map[string]bool, error) {
 	log.Info("Running 'go list -f {{with .Module}}{{.Path}}@{{.Version}}{{end}} all' in", projectDir)
-
-	output, err := runDependenciesCmd(projectDir, []string{"list", "-f", "{{with .Module}}{{.Path}}@{{.Version}}{{end}}", "all"})
+	cmdArgs, err := getListCmdArgs()
+	if err != nil {
+		return nil, err
+	}
+	output, err := runDependenciesCmd(projectDir, append(cmdArgs, []string{"-f", "{{with .Module}}{{.Path}}@{{.Version}}{{end}}", "all"}...))
 	if err != nil {
 		return nil, err
 	}
