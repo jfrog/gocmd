@@ -129,7 +129,6 @@ func GetModuleNameByDir(projectDir string) (string, error) {
 		return "", err
 	}
 	cmdArgs = append(cmdArgs, "-m")
-	log.Info(fmt.Sprintf("Running 'go %s' in %s", strings.Join(cmdArgs, " "), projectDir))
 	output, err := runDependenciesCmd(projectDir, cmdArgs)
 	if err != nil {
 		return "", err
@@ -157,9 +156,7 @@ func GetDependenciesList(projectDir string) (map[string]bool, error) {
 	if err != nil {
 		return nil, err
 	}
-	cmdArgs = append(cmdArgs, "-f", "{{with .Module}}{{.Path}}@{{.Version}}{{end}}", "all")
-	log.Info(fmt.Sprintf("Running 'go %s' in %s", strings.Join(cmdArgs, " "), projectDir))
-	output, err := runDependenciesCmd(projectDir, cmdArgs)
+	output, err := runDependenciesCmd(projectDir, append(cmdArgs, "-f", "{{with .Module}}{{.Path}}@{{.Version}}{{end}}", "all"))
 	if err != nil {
 		return nil, err
 	}
@@ -168,7 +165,6 @@ func GetDependenciesList(projectDir string) (map[string]bool, error) {
 
 // Runs 'go mod graph' command and returns map that maps dependencies to their child dependencies slice
 func GetDependenciesGraph(projectDir string) (map[string][]string, error) {
-	log.Info("Running 'go mod graph' in", projectDir)
 	output, err := runDependenciesCmd(projectDir, []string{"mod", "graph"})
 	if err != nil {
 		return nil, err
@@ -178,6 +174,7 @@ func GetDependenciesGraph(projectDir string) (map[string][]string, error) {
 
 // Common function to run dependencies command for list or graph commands
 func runDependenciesCmd(projectDir string, commandArgs []string) (string, error) {
+	log.Info(fmt.Sprintf("Running 'go %s' in %s", strings.Join(commandArgs, " "), projectDir))
 	var err error
 	if projectDir == "" {
 		projectDir, err = GetProjectRoot()
