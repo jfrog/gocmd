@@ -19,14 +19,14 @@ import (
 
 const GOPROXY = "GOPROXY"
 
-func SetGoProxyWithApi(repoName string, details auth.ServiceDetails, directFallback bool) error {
+func SetGoProxyWithApi(repoName string, details auth.ServiceDetails, vcsFallback bool) error {
 	url, err := GetArtifactoryApiUrl(repoName, details)
 	if err != nil {
 		return err
 	}
 
-	// If directFallback=true, missing packages will be fetched directly from VCS
-	if directFallback {
+	// If vcsFallback=true, missing packages will be fetched directly from VCS
+	if vcsFallback {
 		url += "|direct"
 	}
 	err = os.Setenv(GOPROXY, url)
