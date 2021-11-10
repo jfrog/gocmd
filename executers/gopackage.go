@@ -2,10 +2,10 @@ package executers
 
 import (
 	"fmt"
+	buildinfo "github.com/jfrog/build-info-go/entities"
 
 	"github.com/jfrog/gocmd/cache"
 	"github.com/jfrog/jfrog-client-go/artifactory"
-	"github.com/jfrog/jfrog-client-go/artifactory/buildinfo"
 	_go "github.com/jfrog/jfrog-client-go/artifactory/services/go"
 	"github.com/jfrog/jfrog-client-go/utils/io/fileutils"
 	"github.com/jfrog/jfrog-client-go/utils/log"
@@ -105,8 +105,8 @@ func (dependencyPackage *Package) Dependencies() []buildinfo.Dependency {
 	return dependencyPackage.buildInfoDependencies
 }
 
-// Adds the mod, zip and info files as build info dependencies
-func (dependencyPackage *Package) CreateBuildInfoDependencies() error {
+// PopulateZip adds the zip file as build-info dependency
+func (dependencyPackage *Package) PopulateZip() error {
 	// Zip file dependency for the build-info
 	zipDependency := buildinfo.Dependency{Id: dependencyPackage.id}
 	fileDetails, err := fileutils.GetFileDetails(dependencyPackage.zipPath, true)
