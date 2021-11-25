@@ -72,8 +72,8 @@ func GetGoVersion() (string, error) {
 	return output, errorutils.CheckError(err)
 }
 
-func RunGo(goArg []string, server auth.ServiceDetails, repo string) error {
-	utils.SetGoProxyWithApi(repo, server)
+func RunGo(goArg []string, server auth.ServiceDetails, repo string, noFallback bool) error {
+	utils.SetGoProxyWithApi(repo, server, noFallback)
 
 	goCmd, err := NewCmd()
 	if err != nil {

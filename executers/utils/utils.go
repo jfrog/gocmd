@@ -19,12 +19,16 @@ import (
 
 const GOPROXY = "GOPROXY"
 
-func SetGoProxyWithApi(repoName string, details auth.ServiceDetails) error {
+func SetGoProxyWithApi(repoName string, details auth.ServiceDetails, noFallback bool) error {
 	url, err := GetArtifactoryApiUrl(repoName, details)
 	if err != nil {
 		return err
 	}
 
+	// If noFallback=false, missing packages will be fetched directly from VCS
+	if !noFallback {
+		url += "|direct"
+	}
 	err = os.Setenv(GOPROXY, url)
 	return errorutils.CheckError(err)
 }
