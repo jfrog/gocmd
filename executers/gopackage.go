@@ -114,7 +114,7 @@ func (dependencyPackage *Package) CreateBuildInfoDependencies(includeInfoFiles b
 		return err
 	}
 	zipDependency.Type = "zip"
-	zipDependency.Checksum = &buildinfo.Checksum{Sha1: fileDetails.Checksum.Sha1, Md5: fileDetails.Checksum.Md5}
+	zipDependency.Checksum = buildinfo.Checksum{Sha1: fileDetails.Checksum.Sha1, Md5: fileDetails.Checksum.Md5}
 	dependencyPackage.buildInfoDependencies = append(dependencyPackage.buildInfoDependencies, zipDependency)
 	return nil
 }
